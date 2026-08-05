@@ -16,8 +16,6 @@ import {
 } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
-import { Logo } from "@/components/shared/logo";
-import { ThemeToggle } from "@/components/shared/theme-toggle";
 
 const colorTokens = [
   { name: "background", label: "Background" },
@@ -48,11 +46,6 @@ function ColorSwatch({ name, label }: { name: string; label: string }) {
 export default function DesignSystemPage() {
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-12 px-6 py-12">
-      <header className="flex items-center justify-between">
-        <Logo />
-        <ThemeToggle />
-      </header>
-
       <section className="space-y-4">
         <h1 className="text-3xl font-semibold tracking-tight">Design System</h1>
         <p className="text-muted-foreground">
