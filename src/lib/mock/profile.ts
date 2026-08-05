@@ -29,3 +29,13 @@ export const MOCK_PROFILE: Profile = {
   interests: ["Viagens", "Livros", "Natureza", "Espiritualidade"],
   preferences: { ageRangeMin: 27, ageRangeMax: 38, maxDistance: 25 },
 };
+
+/** Exemplo de perfil compatível, usado só para ilustrar a prévia de compatibilidade do questionário (M4). */
+export const MOCK_MATCH_PREVIEW = {
+  name: "Rafael Nogueira",
+  age: 31,
+  city: "Rio de Janeiro, RJ",
+  bio: "Busco alguém com quem construir uma vida com propósito — família, fé e boas conversas sobre o que realmente importa.",
+  photos: [placeholderPhoto("Rafael Nogueira", 3)],
+  interests: ["Espiritualidade", "Natureza", "Culinária"],
+};
