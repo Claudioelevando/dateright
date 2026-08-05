@@ -44,11 +44,11 @@ export default function Home() {
         </p>
 
         <div className="mt-4 flex flex-col items-center gap-3 sm:flex-row">
-          <Button size="lg" className="h-11 px-6" disabled title="Cadastro em breve">
-            Criar conta
+          <Button asChild size="lg" className="h-11 px-6">
+            <Link href="/cadastro">Criar conta</Link>
           </Button>
           <Button asChild size="lg" variant="outline" className="h-11 px-6">
-            <Link href="/design-system">Ver design system</Link>
+            <Link href="/login">Entrar</Link>
           </Button>
         </div>
       </section>
