@@ -12,8 +12,11 @@ const navItems = [
   { href: "/design-system", label: "Design System" },
 ];
 
+const authRoutes = ["/login", "/cadastro", "/recuperar-senha"];
+
 export function SiteHeader() {
   const pathname = usePathname();
+  const isAuthRoute = authRoutes.includes(pathname ?? "");
 
   return (
     <header className="border-border bg-background/80 sticky top-0 z-40 border-b backdrop-blur-sm">
@@ -22,26 +25,28 @@ export function SiteHeader() {
           <Logo />
         </Link>
 
-        <nav className="flex items-center gap-1">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={isActive ? "page" : undefined}
-                className={cn(
-                  "rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                )}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
+        {!isAuthRoute && (
+          <nav className="flex items-center gap-1">
+            {navItems.map((item) => {
+              const isActive = pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={isActive ? "page" : undefined}
+                  className={cn(
+                    "rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+        )}
 
         <ThemeToggle />
       </div>
