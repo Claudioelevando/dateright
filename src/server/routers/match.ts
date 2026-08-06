@@ -65,7 +65,15 @@ export const matchRouter = router({
       throw new TRPCError({ code: "BAD_REQUEST", message: "Não é possível curtir o próprio perfil." });
     }
 
+    const [lockA, lockB] = canonicalPair(ctx.userId, input.targetProfileId);
+
     return prisma.$transaction(async (tx) => {
+      // Lock por par canonicalizado: sem isso, dois swipes recíprocos quase simultâneos
+      // podem cada um ler o swipe do outro ainda não commitado e concluir "sem match" —
+      // o lock serializa as duas transações desse par, garantindo que a segunda enxergue
+      // o swipe da primeira já commitado.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`${lockA}:${lockB}`}, 0))`;
+
       const target = await tx.profile.findUnique({
         where: { id: input.targetProfileId },
         select: { id: true },
