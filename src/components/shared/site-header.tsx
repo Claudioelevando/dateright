@@ -14,6 +14,8 @@ const navItems = [
   { href: "/", label: "Início" },
   { href: "/onboarding", label: "Onboarding" },
   { href: "/questionnaire", label: "Questionário" },
+  { href: "/discover", label: "Descobrir" },
+  { href: "/matches", label: "Matches" },
   { href: "/profile", label: "Perfil" },
   { href: "/design-system", label: "Design System" },
 ];

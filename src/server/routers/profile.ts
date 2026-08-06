@@ -1,22 +1,13 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
+import { calculateAge } from "@/lib/age";
 import { prisma } from "@/lib/db";
 
 import { protectedProcedure, publicProcedure, router } from "../trpc";
 
 const genderSchema = z.enum(["MASCULINO", "FEMININO"]);
 const interestedInSchema = z.enum(["MASCULINO", "FEMININO", "AMBOS"]);
-
-function calculateAge(birthDate: Date) {
-  const today = new Date();
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const monthDiff = today.getMonth() - birthDate.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-    age -= 1;
-  }
-  return age;
-}
 
 const preferencesInput = z
   .object({
