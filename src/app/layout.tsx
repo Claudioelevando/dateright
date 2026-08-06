@@ -4,6 +4,7 @@ import "./globals.css";
 
 import { ThemeProvider } from "@/components/theme-provider";
 import { SiteHeader } from "@/components/shared/site-header";
+import { TRPCProvider } from "@/lib/trpc/provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,10 +29,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col">
-        <ThemeProvider>
-          <SiteHeader />
-          <main className="flex flex-1 flex-col">{children}</main>
-        </ThemeProvider>
+        <TRPCProvider>
+          <ThemeProvider>
+            <SiteHeader />
+            <main className="flex flex-1 flex-col">{children}</main>
+          </ThemeProvider>
+        </TRPCProvider>
       </body>
     </html>
   );

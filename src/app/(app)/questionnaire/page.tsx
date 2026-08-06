@@ -2,24 +2,68 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FieldError } from "@/components/shared/field-error";
+import { FormAlert } from "@/components/shared/form-alert";
 import { ProfileCard } from "@/components/shared/profile-card";
 import { ProgressBar } from "@/components/shared/progress-bar";
 import { QuestionCard } from "@/components/shared/question-card";
 import { MOCK_MATCH_PREVIEW } from "@/lib/mock/profile";
-import { QUESTIONNAIRE } from "@/lib/mock/questionnaire";
-import type { Answer, Answers } from "@/types/questionnaire";
+import { trpc } from "@/lib/trpc/client";
+import type { Answer, Answers, Question, QuestionType } from "@/types/questionnaire";
 
-const CATEGORIES = Array.from(new Set(QUESTIONNAIRE.map((question) => question.category)));
+const TYPE_MAP: Record<string, QuestionType> = {
+  SINGLE: "single",
+  MULTIPLE: "multiple",
+  SCALE: "scale",
+};
 
-function categoryScore(category: string, answers: Answers) {
-  const scores = QUESTIONNAIRE.filter(
-    (question) => question.category === category && question.type === "scale",
-  )
+function toClientQuestion(q: {
+  id: string;
+  category: string;
+  type: string;
+  text: string;
+  options: unknown;
+  minSelections: number | null;
+  minLabel: string | null;
+  maxLabel: string | null;
+}): Question {
+  const type = TYPE_MAP[q.type];
+  if (type === "multiple") {
+    return {
+      id: q.id,
+      category: q.category,
+      type,
+      text: q.text,
+      options: (q.options as string[] | null) ?? [],
+      minSelections: q.minSelections ?? 1,
+    };
+  }
+  if (type === "scale") {
+    return {
+      id: q.id,
+      category: q.category,
+      type,
+      text: q.text,
+      minLabel: q.minLabel ?? "",
+      maxLabel: q.maxLabel ?? "",
+    };
+  }
+  return {
+    id: q.id,
+    category: q.category,
+    type: "single",
+    text: q.text,
+    options: (q.options as string[] | null) ?? [],
+  };
+}
+
+function categoryScore(questions: Question[], category: string, answers: Answers) {
+  const scores = questions
+    .filter((question) => question.category === category && question.type === "scale")
     .map((question) => answers[question.id])
     .filter((value): value is number => typeof value === "number");
 
@@ -28,26 +72,42 @@ function categoryScore(category: string, answers: Answers) {
   return Math.round(((average - 1) / 4) * 100);
 }
 
-function categoryChoices(category: string, answers: Answers) {
-  return QUESTIONNAIRE.filter(
-    (question) => question.category === category && question.type !== "scale",
-  ).flatMap((question) => {
-    const value = answers[question.id];
-    if (Array.isArray(value)) return value;
-    if (typeof value === "string") return [value];
-    return [];
-  });
+function categoryChoices(questions: Question[], category: string, answers: Answers) {
+  return questions
+    .filter((question) => question.category === category && question.type !== "scale")
+    .flatMap((question) => {
+      const value = answers[question.id];
+      if (Array.isArray(value)) return value;
+      if (typeof value === "string") return [value];
+      return [];
+    });
 }
 
 export default function QuestionnairePage() {
   const router = useRouter();
+  const utils = trpc.useUtils();
+  const { data: rawQuestions, isLoading } = trpc.questionnaire.listQuestions.useQuery();
+  const submitAnswers = trpc.questionnaire.submitAnswers.useMutation();
+
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Answers>({});
   const [error, setError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
 
-  const question = QUESTIONNAIRE[index];
-  const progress = Math.round((index / QUESTIONNAIRE.length) * 100);
+  if (isLoading || !rawQuestions) {
+    return (
+      <div className="flex flex-1 items-center justify-center py-16">
+        <Loader2 className="text-muted-foreground size-6 animate-spin" />
+      </div>
+    );
+  }
+
+  const questions = rawQuestions.map(toClientQuestion);
+  const categories = Array.from(new Set(questions.map((question) => question.category)));
+  const question = questions[index];
+  const progress = Math.round((index / questions.length) * 100);
 
   function setAnswer(value: Answer) {
     setAnswers((current) => ({ ...current, [question.id]: value }));
@@ -62,7 +122,7 @@ export default function QuestionnairePage() {
     return value !== undefined;
   }
 
-  function goNext() {
+  async function goNext() {
     if (!isAnswered()) {
       setError(
         question.type === "multiple"
@@ -72,12 +132,22 @@ export default function QuestionnairePage() {
       return;
     }
 
-    if (index === QUESTIONNAIRE.length - 1) {
-      setIsComplete(true);
+    if (index < questions.length - 1) {
+      setIndex((current) => current + 1);
       return;
     }
 
-    setIndex((current) => current + 1);
+    setSubmitError(null);
+    setIsSubmitting(true);
+    try {
+      await submitAnswers.mutateAsync({ answers });
+      await utils.questionnaire.myAnswers.invalidate();
+      setIsComplete(true);
+    } catch {
+      setSubmitError("Não foi possível salvar suas respostas. Tente novamente.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   function goBack() {
@@ -91,16 +161,16 @@ export default function QuestionnairePage() {
         <div className="space-y-1 text-center">
           <h1 className="text-2xl font-semibold">Seu perfil de valores</h1>
           <p className="text-muted-foreground text-sm">
-            Resultado calculado com dados simulados — o algoritmo real de compatibilidade chega com
-            o backend (M12).
+            Respostas salvas. O algoritmo de compatibilidade completo chega com o milestone de
+            matching.
           </p>
         </div>
 
         <Card>
           <CardContent className="space-y-5 pt-6">
-            {CATEGORIES.map((category) => {
-              const score = categoryScore(category, answers);
-              const choices = categoryChoices(category, answers);
+            {categories.map((category) => {
+              const score = categoryScore(questions, category, answers);
+              const choices = categoryChoices(questions, category, answers);
               return (
                 <div key={category} className="space-y-2">
                   <div className="flex items-center justify-between text-sm font-medium">
@@ -148,7 +218,7 @@ export default function QuestionnairePage() {
     <div className="mx-auto w-full max-w-lg flex-1 px-6 py-10">
       <ProgressBar
         value={progress}
-        label={`Pergunta ${index + 1} de ${QUESTIONNAIRE.length}`}
+        label={`Pergunta ${index + 1} de ${questions.length}`}
         className="mb-8"
       />
 
@@ -161,6 +231,7 @@ export default function QuestionnairePage() {
         <CardContent className="space-y-2">
           <QuestionCard question={question} value={answers[question.id]} onChange={setAnswer} />
           <FieldError message={error ?? undefined} />
+          {submitError && <FormAlert variant="error">{submitError}</FormAlert>}
         </CardContent>
         <CardContent className="flex items-center justify-between pt-0">
           <Button
@@ -173,8 +244,9 @@ export default function QuestionnairePage() {
             <ArrowLeft className="size-4" />
             Voltar
           </Button>
-          <Button type="button" onClick={goNext} className="gap-1.5">
-            {index === QUESTIONNAIRE.length - 1 ? "Ver resultado" : "Próxima"}
+          <Button type="button" onClick={goNext} disabled={isSubmitting} className="gap-1.5">
+            {isSubmitting && <Loader2 className="size-4 animate-spin" />}
+            {index === questions.length - 1 ? "Ver resultado" : "Próxima"}
             <ArrowRight className="size-4" />
           </Button>
         </CardContent>

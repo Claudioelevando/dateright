@@ -13,11 +13,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { FieldError } from "@/components/shared/field-error";
+import { FormAlert } from "@/components/shared/form-alert";
 import { InterestPicker } from "@/components/shared/interest-picker";
 import { PhotoUpload, type UploadedPhoto } from "@/components/shared/photo-upload";
 import { ProfileCard } from "@/components/shared/profile-card";
 import { StepIndicator } from "@/components/shared/step-indicator";
-import { INTEREST_OPTIONS } from "@/lib/mock/profile";
+import { createClient } from "@/lib/supabase/client";
+import { trpc } from "@/lib/trpc/client";
+import { cn } from "@/lib/utils";
 
 function calculateAge(birthDate: string) {
   const today = new Date();
@@ -30,6 +33,23 @@ function calculateAge(birthDate: string) {
   return age;
 }
 
+function extensionForMime(mime: string) {
+  if (mime.includes("png")) return "png";
+  if (mime.includes("webp")) return "webp";
+  return "jpg";
+}
+
+const GENDER_OPTIONS = [
+  { value: "MASCULINO", label: "Masculino" },
+  { value: "FEMININO", label: "Feminino" },
+] as const;
+
+const INTERESTED_IN_OPTIONS = [
+  { value: "MASCULINO", label: "Homens" },
+  { value: "FEMININO", label: "Mulheres" },
+  { value: "AMBOS", label: "Ambos" },
+] as const;
+
 const onboardingSchema = z
   .object({
     name: z.string().min(2, "Informe seu nome completo."),
@@ -38,6 +58,8 @@ const onboardingSchema = z
       .min(1, "Informe sua data de nascimento.")
       .refine((value) => calculateAge(value) >= 18, "Você precisa ter pelo menos 18 anos."),
     city: z.string().min(2, "Informe sua cidade."),
+    gender: z.enum(["MASCULINO", "FEMININO"], { error: "Selecione uma opção." }),
+    interestedIn: z.enum(["MASCULINO", "FEMININO", "AMBOS"], { error: "Selecione uma opção." }),
     bio: z
       .string()
       .min(20, "Escreva pelo menos 20 caracteres.")
@@ -57,6 +79,11 @@ const STEPS = ["Informações", "Fotos", "Bio e preferências", "Revisão"];
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const utils = trpc.useUtils();
+  const { data: availableInterests } = trpc.profile.listInterests.useQuery();
+  const completeOnboarding = trpc.profile.completeOnboarding.useMutation();
+  const addPhoto = trpc.profile.addPhoto.useMutation();
+
   const [step, setStep] = useState(0);
   const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
   const [photosError, setPhotosError] = useState<string | null>(null);
@@ -65,6 +92,7 @@ export default function OnboardingPage() {
   const [maxDistance, setMaxDistance] = useState(25);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const {
     register,
@@ -78,10 +106,13 @@ export default function OnboardingPage() {
   });
 
   const values = watch();
+  const interestLabelToSlug = new Map(
+    (availableInterests ?? []).map((interest) => [interest.label, interest.slug]),
+  );
 
   async function goNext() {
     if (step === 0) {
-      const valid = await trigger(["name", "birthDate", "city"]);
+      const valid = await trigger(["name", "birthDate", "city", "gender", "interestedIn"]);
       if (!valid) return;
     }
 
@@ -110,12 +141,58 @@ export default function OnboardingPage() {
     setStep((current) => Math.max(current - 1, 0));
   }
 
-  async function onSubmit() {
+  async function onSubmit(data: OnboardingOutput) {
+    setSubmitError(null);
     setIsSubmitting(true);
-    // Dados mockados — sem integração real ainda (M3).
-    await new Promise((resolve) => setTimeout(resolve, 900));
-    setIsSubmitting(false);
-    setIsComplete(true);
+
+    try {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setSubmitError("Sessão expirada. Faça login novamente.");
+        router.push("/login");
+        return;
+      }
+
+      const interestSlugs = interests
+        .map((label) => interestLabelToSlug.get(label))
+        .filter((slug): slug is string => !!slug);
+
+      await completeOnboarding.mutateAsync({
+        name: data.name,
+        birthDate: new Date(data.birthDate),
+        city: data.city,
+        gender: data.gender,
+        interestedIn: data.interestedIn,
+        bio: data.bio,
+        interestSlugs,
+        ageRangeMin: data.ageRangeMin,
+        ageRangeMax: data.ageRangeMax,
+        maxDistanceKm: maxDistance,
+      });
+
+      for (const photo of photos) {
+        if (!photo.file) continue;
+        const path = `${user.id}/${photo.id}.${extensionForMime(photo.file.type)}`;
+        const { error: uploadError } = await supabase.storage
+          .from("profile-photos")
+          .upload(path, photo.file, { contentType: photo.file.type, upsert: true });
+
+        if (uploadError) throw uploadError;
+
+        await addPhoto.mutateAsync({ storagePath: path });
+      }
+
+      await utils.profile.me.invalidate();
+      setIsComplete(true);
+    } catch {
+      setSubmitError("Não foi possível salvar seu perfil. Tente novamente.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   if (isComplete) {
@@ -126,10 +203,17 @@ export default function OnboardingPage() {
         </div>
         <h1 className="text-2xl font-semibold">Perfil criado!</h1>
         <p className="text-muted-foreground text-sm">
-          Seu perfil foi criado com dados simulados (sem integração real ainda). A próxima etapa é o
-          questionário de valores.
+          Seu perfil foi salvo. A próxima etapa é o questionário de valores.
         </p>
-        <Button size="lg" className="h-11 w-full" onClick={() => router.push("/profile")}>
+        <Button size="lg" className="h-11 w-full" onClick={() => router.push("/questionnaire")}>
+          Ir para o questionário
+        </Button>
+        <Button
+          variant="ghost"
+          size="lg"
+          className="h-11 w-full"
+          onClick={() => router.push("/profile")}
+        >
           Ver meu perfil
         </Button>
       </div>
@@ -181,6 +265,54 @@ export default function OnboardingPage() {
                   />
                   <FieldError message={errors.city?.message} />
                 </div>
+
+                <div className="space-y-1.5">
+                  <Label>Gênero</Label>
+                  <div role="radiogroup" aria-label="Gênero" className="flex gap-2">
+                    {GENDER_OPTIONS.map((option) => (
+                      <label
+                        key={option.value}
+                        className={cn(
+                          "has-[:checked]:border-primary has-[:checked]:bg-primary/5 has-[:checked]:text-foreground",
+                          "border-border text-muted-foreground flex flex-1 cursor-pointer items-center justify-center rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors",
+                        )}
+                      >
+                        <input
+                          type="radio"
+                          value={option.value}
+                          className="sr-only"
+                          {...register("gender")}
+                        />
+                        {option.label}
+                      </label>
+                    ))}
+                  </div>
+                  <FieldError message={errors.gender?.message} />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Interessado(a) em</Label>
+                  <div role="radiogroup" aria-label="Interessado(a) em" className="flex gap-2">
+                    {INTERESTED_IN_OPTIONS.map((option) => (
+                      <label
+                        key={option.value}
+                        className={cn(
+                          "has-[:checked]:border-primary has-[:checked]:bg-primary/5 has-[:checked]:text-foreground",
+                          "border-border text-muted-foreground flex flex-1 cursor-pointer items-center justify-center rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors",
+                        )}
+                      >
+                        <input
+                          type="radio"
+                          value={option.value}
+                          className="sr-only"
+                          {...register("interestedIn")}
+                        />
+                        {option.label}
+                      </label>
+                    ))}
+                  </div>
+                  <FieldError message={errors.interestedIn?.message} />
+                </div>
               </CardContent>
             </>
           )}
@@ -222,7 +354,7 @@ export default function OnboardingPage() {
                 <div className="space-y-1.5">
                   <Label>Interesses</Label>
                   <InterestPicker
-                    options={INTEREST_OPTIONS}
+                    options={(availableInterests ?? []).map((interest) => interest.label)}
                     value={interests}
                     onChange={setInterests}
                   />
@@ -279,7 +411,8 @@ export default function OnboardingPage() {
                 <CardTitle className="text-xl">Revisão</CardTitle>
                 <CardDescription>Confira como seu perfil vai aparecer.</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                {submitError && <FormAlert variant="error">{submitError}</FormAlert>}
                 <ProfileCard
                   className="mx-auto max-w-xs"
                   profile={{

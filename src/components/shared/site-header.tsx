@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { LogOut } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/shared/logo";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
+import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/client";
 
 const navItems = [
   { href: "/", label: "Início" },
@@ -19,7 +22,15 @@ const authRoutes = ["/login", "/cadastro", "/recuperar-senha"];
 
 export function SiteHeader() {
   const pathname = usePathname();
+  const router = useRouter();
   const isAuthRoute = authRoutes.includes(pathname ?? "");
+
+  async function handleSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  }
 
   return (
     <header className="border-border bg-background/80 sticky top-0 z-40 border-b backdrop-blur-sm">
@@ -51,7 +62,20 @@ export function SiteHeader() {
           </nav>
         )}
 
-        <ThemeToggle />
+        <div className="flex items-center gap-1">
+          {!isAuthRoute && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Sair"
+              onClick={handleSignOut}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <LogOut className="size-4" />
+            </Button>
+          )}
+          <ThemeToggle />
+        </div>
       </div>
     </header>
   );

@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// id casa com o id do usuário em auth.users (Supabase Auth).
+// O FK real para auth.users é criado via SQL em migration (Prisma não gerencia o schema `auth`).
+model Profile {
+  id                    String    @id @db.Uuid
+  email                 String    @unique
+  name                  String
+  birthDate             DateTime  @db.Date
+  city                  String
+  bio                   String?
+  gender                Gender
+  interestedIn          InterestedIn
+  ageRangeMin           Int       @default(18)
+  ageRangeMax           Int       @default(99)
+  maxDistanceKm         Int       @default(50)
+  onboardingCompletedAt DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  photos    ProfilePhoto[]
+  interests ProfileInterest[]
+  answers   QuestionnaireAnswer[]
+
+  @@map("profiles")
+}
+
+enum Gender {
+  MASCULINO
+  FEMININO
+}
+
+enum InterestedIn {
+  MASCULINO
+  FEMININO
+  AMBOS
+}
+
+model ProfilePhoto {
+  id        String   @id @default(uuid()) @db.Uuid
+  profileId String   @db.Uuid
+  storagePath String // caminho no bucket do Supabase Storage
+  position  Int // 0 = capa
+  createdAt DateTime @default(now())
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, position])
+  @@map("profile_photos")
+}
+
+model Interest {
+  id    String @id @default(uuid()) @db.Uuid
+  slug  String @unique
+  label String
+  order Int    @default(0)
+
+  profiles ProfileInterest[]
+
+  @@map("interests")
+}
+
+model ProfileInterest {
+  profileId  String @db.Uuid
+  interestId String @db.Uuid
+
+  profile  Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  interest Interest @relation(fields: [interestId], references: [id], onDelete: Cascade)
+
+  @@id([profileId, interestId])
+  @@map("profile_interests")
+}
+
+enum QuestionType {
+  SINGLE
+  MULTIPLE
+  SCALE
+}
+
+model QuestionnaireQuestion {
+  id            String       @id @default(uuid()) @db.Uuid
+  code          String       @unique // slug estável, ex: "relacionamento-compromisso"
+  category      String
+  type          QuestionType
+  text          String
+  options       Json? // string[] — apenas single/multiple
+  minSelections Int? // apenas multiple
+  minLabel      String? // apenas scale
+  maxLabel      String? // apenas scale
+  order         Int
+  active        Boolean      @default(true)
+
+  answers QuestionnaireAnswer[]
+
+  @@map("questionnaire_questions")
+}
+
+model QuestionnaireAnswer {
+  id         String   @id @default(uuid()) @db.Uuid
+  profileId  String   @db.Uuid
+  questionId String   @db.Uuid
+  value      Json // string | string[] | number
+  answeredAt DateTime @default(now())
+
+  profile  Profile               @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  question QuestionnaireQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, questionId])
+  @@map("questionnaire_answers")
+}

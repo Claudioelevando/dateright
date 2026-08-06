@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
@@ -16,10 +15,8 @@ import { FieldError } from "@/components/shared/field-error";
 import { FormAlert } from "@/components/shared/form-alert";
 import { createClient } from "@/lib/supabase/client";
 
-const signupSchema = z
+const updatePasswordSchema = z
   .object({
-    name: z.string().min(2, "Informe seu nome completo."),
-    email: z.string().min(1, "Informe seu e-mail.").email("Informe um e-mail válido."),
     password: z.string().min(8, "A senha deve ter pelo menos 8 caracteres."),
     confirmPassword: z.string().min(1, "Confirme sua senha."),
   })
@@ -28,92 +25,47 @@ const signupSchema = z
     path: ["confirmPassword"],
   });
 
-type SignupValues = z.infer<typeof signupSchema>;
+type UpdatePasswordValues = z.infer<typeof updatePasswordSchema>;
 
-export default function CadastroPage() {
+export default function AtualizarSenhaPage() {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);
 
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<SignupValues>({ resolver: zodResolver(signupSchema) });
+  } = useForm<UpdatePasswordValues>({ resolver: zodResolver(updatePasswordSchema) });
 
-  async function onSubmit(values: SignupValues) {
+  async function onSubmit(values: UpdatePasswordValues) {
     setServerError(null);
-    setSuccess(false);
 
     const supabase = createClient();
-    const { data, error } = await supabase.auth.signUp({
-      email: values.email,
-      password: values.password,
-      options: { data: { name: values.name } },
-    });
+    const { error } = await supabase.auth.updateUser({ password: values.password });
 
     if (error) {
       setServerError(
-        error.message.toLowerCase().includes("already")
-          ? "Este e-mail já está cadastrado."
-          : error.message,
+        "Não foi possível atualizar sua senha. O link pode ter expirado — solicite um novo.",
       );
       return;
     }
 
-    setSuccess(true);
-
-    if (data.session) {
-      router.push("/onboarding");
-      router.refresh();
-    } else {
-      setNeedsEmailConfirmation(true);
-    }
+    router.push("/profile");
+    router.refresh();
   }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">Criar conta</CardTitle>
-        <CardDescription>Comece sua jornada por relacionamentos com propósito.</CardDescription>
+        <CardTitle className="text-xl">Definir nova senha</CardTitle>
+        <CardDescription>Escolha uma nova senha para sua conta.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {serverError && <FormAlert variant="error">{serverError}</FormAlert>}
-        {success && needsEmailConfirmation && (
-          <FormAlert variant="success">
-            Cadastro criado! Confira seu e-mail para confirmar a conta antes de entrar.
-          </FormAlert>
-        )}
 
         <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="name">Nome</Label>
-            <Input
-              id="name"
-              autoComplete="name"
-              placeholder="Seu nome"
-              aria-invalid={!!errors.name}
-              {...register("name")}
-            />
-            <FieldError message={errors.name?.message} />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="email">E-mail</Label>
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              placeholder="seu@email.com"
-              aria-invalid={!!errors.email}
-              {...register("email")}
-            />
-            <FieldError message={errors.email?.message} />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="password">Senha</Label>
+            <Label htmlFor="password">Nova senha</Label>
             <Input
               id="password"
               type="password"
@@ -126,7 +78,7 @@ export default function CadastroPage() {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="confirmPassword">Confirmar senha</Label>
+            <Label htmlFor="confirmPassword">Confirmar nova senha</Label>
             <Input
               id="confirmPassword"
               type="password"
@@ -140,16 +92,9 @@ export default function CadastroPage() {
 
           <Button type="submit" className="h-10 w-full" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="size-4 animate-spin" />}
-            Criar conta
+            Salvar nova senha
           </Button>
         </form>
-
-        <p className="text-muted-foreground text-center text-sm">
-          Já tem conta?{" "}
-          <Link href="/login" className="text-primary font-medium hover:underline">
-            Entrar
-          </Link>
-        </p>
       </CardContent>
     </Card>
   );
