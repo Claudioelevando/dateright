@@ -95,13 +95,22 @@ export const discoverRouter = router({
     });
 
     // O bounding box acima é um pré-filtro quadrado (mais barato no banco); o filtro exato por
-    // raio circular acontece aqui via Haversine, sobre o lote já reduzido.
+    // raio circular acontece aqui via Haversine, sobre o lote já reduzido. A distância calculada
+    // é reaproveitada abaixo na resposta, em vez de recalculada.
+    const distanceByCandidateId = new Map<string, number>();
+    if (myCoordinates) {
+      for (const candidate of candidates) {
+        if (candidate.latitude == null || candidate.longitude == null) continue;
+        distanceByCandidateId.set(
+          candidate.id,
+          distanceKm(myCoordinates, { lat: candidate.latitude, lng: candidate.longitude }),
+        );
+      }
+    }
+
     const withinRadius = candidates.filter((candidate) => {
-      if (!myCoordinates || candidate.latitude == null || candidate.longitude == null) return true;
-      return (
-        distanceKm(myCoordinates, { lat: candidate.latitude, lng: candidate.longitude }) <=
-        me.maxDistanceKm
-      );
+      const distance = distanceByCandidateId.get(candidate.id);
+      return distance === undefined || distance <= me.maxDistanceKm;
     });
 
     if (withinRadius.length === 0) return [];
@@ -127,10 +136,10 @@ export const discoverRouter = router({
         name: candidate.name,
         age: calculateAge(candidate.birthDate),
         city: candidate.city,
-        distanceKm:
-          myCoordinates && candidate.latitude != null && candidate.longitude != null
-            ? Math.round(distanceKm(myCoordinates, { lat: candidate.latitude, lng: candidate.longitude }))
-            : undefined,
+        distanceKm: (() => {
+          const distance = distanceByCandidateId.get(candidate.id);
+          return distance === undefined ? undefined : Math.round(distance);
+        })(),
         bio: candidate.bio ?? undefined,
         photos: await signCoverPhoto(candidate.photos[0]?.storagePath),
         interests: candidate.interests.map((ci) => ci.interest.label),
