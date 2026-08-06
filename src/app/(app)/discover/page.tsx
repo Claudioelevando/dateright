@@ -19,6 +19,7 @@ import { ProfileCard } from "@/components/shared/profile-card";
 import { trpc } from "@/lib/trpc/client";
 
 export default function DiscoverPage() {
+  const utils = trpc.useUtils();
   const { data: candidates, isLoading, refetch } = trpc.discover.getCandidates.useQuery({});
   const swipe = trpc.match.swipe.useMutation();
 
@@ -59,7 +60,7 @@ export default function DiscoverPage() {
 
       {current ? (
         <div className="space-y-6">
-          <ProfileCard profile={current} />
+          <ProfileCard profile={current} onBlocked={() => utils.discover.getCandidates.invalidate()} />
           <div className="flex justify-center gap-6">
             <Button
               variant="outline"

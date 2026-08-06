@@ -7,6 +7,7 @@ import { Loader2, MapPin, Pencil } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -58,9 +59,13 @@ export default function ProfilePage() {
   const utils = trpc.useUtils();
   const { data: profile, isLoading } = trpc.profile.me.useQuery();
   const { data: availableInterests } = trpc.profile.listInterests.useQuery();
+  const { data: blockedProfiles } = trpc.moderation.listBlocked.useQuery();
   const updatePreferences = trpc.profile.updatePreferences.useMutation();
   const addPhoto = trpc.profile.addPhoto.useMutation();
   const removePhoto = trpc.profile.removePhoto.useMutation();
+  const unblock = trpc.moderation.unblock.useMutation({
+    onSuccess: () => utils.moderation.listBlocked.invalidate(),
+  });
 
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -242,6 +247,36 @@ export default function ProfilePage() {
               </div>
             </CardContent>
           </Card>
+
+          {blockedProfiles && blockedProfiles.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Perfis bloqueados</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {blockedProfiles.map((blocked) => (
+                  <div key={blocked.profileId} className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <Avatar size="sm">
+                        <AvatarImage src={blocked.photos[0]} alt={`Foto de ${blocked.name}`} />
+                        <AvatarFallback>{blocked.name[0]}</AvatarFallback>
+                      </Avatar>
+                      <p className="text-sm font-medium">{blocked.name}</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      aria-label={`Desbloquear ${blocked.name}`}
+                      disabled={unblock.isPending}
+                      onClick={() => unblock.mutate({ profileId: blocked.profileId })}
+                    >
+                      Desbloquear
+                    </Button>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </div>
       ) : (
         <Card>

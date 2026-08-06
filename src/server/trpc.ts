@@ -14,3 +14,30 @@ export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
   }
   return next({ ctx: { ...ctx, userId: ctx.userId } });
 });
+
+// Além de autenticado, exige que a conta não esteja suspensa — usado nas superfícies de
+// interação com outros usuários (descoberta, match, chat). Perfil/Premium/moderação continuam
+// em protectedProcedure puro: um usuário suspenso ainda precisa ver e entender sua suspensão.
+export const activeProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (ctx.isSuspended) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Sua conta foi suspensa e não pode interagir com outros usuários.",
+    });
+  }
+  return next({ ctx });
+});
+
+export const moderatorProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (ctx.role !== "MODERATOR" && ctx.role !== "ADMIN") {
+    throw new TRPCError({ code: "FORBIDDEN" });
+  }
+  return next({ ctx });
+});
+
+export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (ctx.role !== "ADMIN") {
+    throw new TRPCError({ code: "FORBIDDEN" });
+  }
+  return next({ ctx });
+});
