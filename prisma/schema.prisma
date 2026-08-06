@@ -29,6 +29,11 @@ model Profile {
   interests ProfileInterest[]
   answers   QuestionnaireAnswer[]
 
+  swipesGiven    Swipe[] @relation("SwipesGiven")
+  swipesReceived Swipe[] @relation("SwipesReceived")
+  matchesAsA     Match[] @relation("MatchesAsA")
+  matchesAsB     Match[] @relation("MatchesAsB")
+
   @@map("profiles")
 }
 
@@ -114,4 +119,40 @@ model QuestionnaireAnswer {
 
   @@unique([profileId, questionId])
   @@map("questionnaire_answers")
+}
+
+enum SwipeAction {
+  LIKE
+  PASS
+}
+
+model Swipe {
+  id        String      @id @default(uuid()) @db.Uuid
+  swiperId  String      @db.Uuid
+  swipedId  String      @db.Uuid
+  action    SwipeAction
+  createdAt DateTime    @default(now())
+
+  swiper Profile @relation("SwipesGiven", fields: [swiperId], references: [id], onDelete: Cascade)
+  swiped Profile @relation("SwipesReceived", fields: [swipedId], references: [id], onDelete: Cascade)
+
+  @@unique([swiperId, swipedId])
+  @@index([swipedId])
+  @@map("swipes")
+}
+
+// userAId < userBId sempre (canonicalizado em código) — evita linhas duplicadas para o
+// mesmo par em ordens diferentes; reforçado por CHECK na migration.
+model Match {
+  id        String   @id @default(uuid()) @db.Uuid
+  userAId   String   @db.Uuid
+  userBId   String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  userA Profile @relation("MatchesAsA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB Profile @relation("MatchesAsB", fields: [userBId], references: [id], onDelete: Cascade)
+
+  @@unique([userAId, userBId])
+  @@index([userBId])
+  @@map("matches")
 }

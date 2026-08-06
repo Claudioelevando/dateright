@@ -18,7 +18,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import pg from "pg";
 
-config({ path: ".env.local" });
+config({ path: ".env.local", quiet: true });
 
 const MIGRATIONS_DIR = join(import.meta.dirname, "..", "prisma", "migrations");
 
