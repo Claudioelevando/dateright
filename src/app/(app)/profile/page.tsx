@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, MapPin, Pencil } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -15,7 +16,8 @@ import { FieldError } from "@/components/shared/field-error";
 import { FormAlert } from "@/components/shared/form-alert";
 import { InterestPicker } from "@/components/shared/interest-picker";
 import { PhotoUpload, type UploadedPhoto } from "@/components/shared/photo-upload";
-import { INTEREST_OPTIONS, MOCK_PROFILE } from "@/lib/mock/profile";
+import { createClient } from "@/lib/supabase/client";
+import { trpc } from "@/lib/trpc/client";
 
 const profileSchema = z
   .object({
@@ -34,36 +36,144 @@ const profileSchema = z
 type ProfileInput = z.input<typeof profileSchema>;
 type ProfileOutput = z.output<typeof profileSchema>;
 
+function calculateAge(birthDate: string | Date) {
+  const today = new Date();
+  const birth = new Date(birthDate);
+  let age = today.getFullYear() - birth.getFullYear();
+  const hasHadBirthdayThisYear =
+    today.getMonth() > birth.getMonth() ||
+    (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate());
+  if (!hasHadBirthdayThisYear) age -= 1;
+  return age;
+}
+
+function extensionForMime(mime: string) {
+  if (mime.includes("png")) return "png";
+  if (mime.includes("webp")) return "webp";
+  return "jpg";
+}
+
 export default function ProfilePage() {
+  const router = useRouter();
+  const utils = trpc.useUtils();
+  const { data: profile, isLoading } = trpc.profile.me.useQuery();
+  const { data: availableInterests } = trpc.profile.listInterests.useQuery();
+  const updatePreferences = trpc.profile.updatePreferences.useMutation();
+  const addPhoto = trpc.profile.addPhoto.useMutation();
+  const removePhoto = trpc.profile.removePhoto.useMutation();
+
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [photos, setPhotos] = useState<UploadedPhoto[]>(
-    MOCK_PROFILE.photos.map((url) => ({ id: url, url })),
-  );
-  const [interests, setInterests] = useState<string[]>(MOCK_PROFILE.interests);
-  const [maxDistance, setMaxDistance] = useState(MOCK_PROFILE.preferences.maxDistance);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
+  const [initialPhotoIds, setInitialPhotoIds] = useState<string[]>([]);
+  const [interests, setInterests] = useState<string[]>([]);
+  const [maxDistance, setMaxDistance] = useState(25);
 
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors },
-  } = useForm<ProfileInput, unknown, ProfileOutput>({
-    resolver: zodResolver(profileSchema),
-    defaultValues: {
-      bio: MOCK_PROFILE.bio,
-      ageRangeMin: MOCK_PROFILE.preferences.ageRangeMin,
-      ageRangeMax: MOCK_PROFILE.preferences.ageRangeMax,
-    },
-  });
+  } = useForm<ProfileInput, unknown, ProfileOutput>({ resolver: zodResolver(profileSchema) });
 
-  async function onSubmit() {
+  const interestLabelToSlug = new Map(
+    (availableInterests ?? []).map((interest) => [interest.label, interest.slug]),
+  );
+
+  // Sincroniza o estado editável local quando o perfil carrega/muda — feito durante a
+  // renderização (não em um efeito) seguindo o padrão de "ajustar estado quando uma prop
+  // muda" do React, já que interests/maxDistance viram estado próprio editável pelo usuário.
+  const [syncedProfileId, setSyncedProfileId] = useState<string | null>(null);
+  if (profile && profile.id !== syncedProfileId) {
+    setSyncedProfileId(profile.id);
+    reset({
+      bio: profile.bio ?? "",
+      ageRangeMin: profile.ageRangeMin,
+      ageRangeMax: profile.ageRangeMax,
+    });
+    setInterests(profile.interests.map((pi) => pi.interest.label));
+    setMaxDistance(profile.maxDistanceKm);
+  }
+
+  useEffect(() => {
+    if (!profile) return;
+
+    const supabase = createClient();
+    Promise.all(
+      profile.photos.map(async (photo) => {
+        const { data } = await supabase.storage
+          .from("profile-photos")
+          .createSignedUrl(photo.storagePath, 3600);
+        return { id: photo.id, url: data?.signedUrl ?? "", storagePath: photo.storagePath };
+      }),
+    ).then((signed) => {
+      setPhotos(signed);
+      setInitialPhotoIds(signed.map((p) => p.id));
+    });
+  }, [profile]);
+
+  useEffect(() => {
+    if (!isLoading && profile === null) router.replace("/onboarding");
+  }, [isLoading, profile, router]);
+
+  async function onSubmit(data: ProfileOutput) {
+    if (!profile) return;
+    setSaveError(null);
     setIsSaving(true);
-    // Dados mockados — sem integração real ainda (M3).
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    setIsSaving(false);
-    setSaved(true);
-    setIsEditing(false);
+
+    try {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("no session");
+
+      const removedIds = initialPhotoIds.filter((id) => !photos.some((p) => p.id === id));
+      for (const photoId of removedIds) {
+        const result = await removePhoto.mutateAsync({ photoId });
+        await supabase.storage.from("profile-photos").remove([result.storagePath]);
+      }
+
+      for (const photo of photos) {
+        if (!photo.file) continue;
+        const path = `${user.id}/${photo.id}.${extensionForMime(photo.file.type)}`;
+        const { error: uploadError } = await supabase.storage
+          .from("profile-photos")
+          .upload(path, photo.file, { contentType: photo.file.type, upsert: true });
+        if (uploadError) throw uploadError;
+        await addPhoto.mutateAsync({ storagePath: path });
+      }
+
+      const interestSlugs = interests
+        .map((label) => interestLabelToSlug.get(label))
+        .filter((slug): slug is string => !!slug);
+
+      await updatePreferences.mutateAsync({
+        bio: data.bio,
+        interestSlugs,
+        ageRangeMin: data.ageRangeMin,
+        ageRangeMax: data.ageRangeMax,
+        maxDistanceKm: maxDistance,
+      });
+
+      await utils.profile.me.invalidate();
+      setSaved(true);
+      setIsEditing(false);
+    } catch {
+      setSaveError("Não foi possível salvar as alterações. Tente novamente.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  if (isLoading || !profile) {
+    return (
+      <div className="flex flex-1 items-center justify-center py-16">
+        <Loader2 className="text-muted-foreground size-6 animate-spin" />
+      </div>
+    );
   }
 
   return (
@@ -80,7 +190,7 @@ export default function ProfilePage() {
 
       {saved && (
         <FormAlert variant="success" className="mb-4">
-          Perfil atualizado (dados simulados, sem integração real ainda).
+          Perfil atualizado.
         </FormAlert>
       )}
 
@@ -92,9 +202,10 @@ export default function ProfilePage() {
                 key={photo.id}
                 className="border-border relative aspect-square overflow-hidden rounded-xl border"
               >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={photo.url}
-                  alt={`Foto ${index + 1} de ${MOCK_PROFILE.name}`}
+                  alt={`Foto ${index + 1} de ${profile.name}`}
                   className="size-full object-cover"
                 />
               </div>
@@ -104,15 +215,15 @@ export default function ProfilePage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-xl">
-                {MOCK_PROFILE.name}, {MOCK_PROFILE.age}
+                {profile.name}, {calculateAge(profile.birthDate)}
               </CardTitle>
               <p className="text-muted-foreground flex items-center gap-1 text-sm">
                 <MapPin className="size-3.5" />
-                {MOCK_PROFILE.city}
+                {profile.city}
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm">{MOCK_PROFILE.bio}</p>
+              <p className="text-sm">{profile.bio}</p>
               <div className="flex flex-wrap gap-1.5">
                 {interests.map((interest) => (
                   <span
@@ -125,8 +236,7 @@ export default function ProfilePage() {
               </div>
               <div className="text-muted-foreground grid grid-cols-2 gap-3 text-sm">
                 <p>
-                  Faixa etária: {MOCK_PROFILE.preferences.ageRangeMin}–
-                  {MOCK_PROFILE.preferences.ageRangeMax} anos
+                  Faixa etária: {profile.ageRangeMin}–{profile.ageRangeMax} anos
                 </p>
                 <p>Distância máxima: {maxDistance} km</p>
               </div>
@@ -140,6 +250,8 @@ export default function ProfilePage() {
               <CardTitle className="text-xl">Editar perfil</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
+              {saveError && <FormAlert variant="error">{saveError}</FormAlert>}
+
               <div className="space-y-1.5">
                 <Label>Fotos</Label>
                 <PhotoUpload photos={photos} onChange={setPhotos} />
@@ -154,7 +266,7 @@ export default function ProfilePage() {
               <div className="space-y-1.5">
                 <Label>Interesses</Label>
                 <InterestPicker
-                  options={INTEREST_OPTIONS}
+                  options={(availableInterests ?? []).map((interest) => interest.label)}
                   value={interests}
                   onChange={setInterests}
                 />

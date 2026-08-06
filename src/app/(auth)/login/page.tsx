@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -13,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FieldError } from "@/components/shared/field-error";
 import { FormAlert } from "@/components/shared/form-alert";
+import { createClient } from "@/lib/supabase/client";
 
 const loginSchema = z.object({
   email: z.string().min(1, "Informe seu e-mail.").email("Informe um e-mail válido."),
@@ -22,6 +24,7 @@ const loginSchema = z.object({
 type LoginValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
+  const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
@@ -35,15 +38,20 @@ export default function LoginPage() {
     setServerError(null);
     setSuccess(false);
 
-    // Dados mockados — sem integração real ainda (M2).
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithPassword({
+      email: values.email,
+      password: values.password,
+    });
 
-    if (values.email === "erro@teste.com") {
+    if (error) {
       setServerError("E-mail ou senha incorretos.");
       return;
     }
 
     setSuccess(true);
+    router.push("/profile");
+    router.refresh();
   }
 
   return (
@@ -54,9 +62,7 @@ export default function LoginPage() {
       </CardHeader>
       <CardContent className="space-y-4">
         {serverError && <FormAlert variant="error">{serverError}</FormAlert>}
-        {success && (
-          <FormAlert variant="success">Login simulado com sucesso (dados mockados).</FormAlert>
-        )}
+        {success && <FormAlert variant="success">Login realizado com sucesso.</FormAlert>}
 
         <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
           <div className="space-y-1.5">
@@ -94,10 +100,6 @@ export default function LoginPage() {
             {isSubmitting && <Loader2 className="size-4 animate-spin" />}
             Entrar
           </Button>
-
-          <p className="text-muted-foreground text-center text-xs">
-            Dica: use <code className="font-mono">erro@teste.com</code> para simular um erro.
-          </p>
         </form>
 
         <p className="text-muted-foreground text-center text-sm">

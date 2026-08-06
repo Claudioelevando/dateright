@@ -9,6 +9,10 @@ import { cn } from "@/lib/utils";
 export interface UploadedPhoto {
   id: string;
   url: string;
+  /** Presente apenas para fotos recém-selecionadas, ainda não enviadas ao Storage. */
+  file?: File;
+  /** Presente apenas para fotos já persistidas (carregadas do servidor). */
+  storagePath?: string;
 }
 
 interface PhotoUploadProps {
@@ -27,7 +31,7 @@ export function PhotoUpload({ photos, onChange, maxPhotos = 6, className }: Phot
     const remainingSlots = maxPhotos - photos.length;
     const newPhotos = Array.from(fileList)
       .slice(0, remainingSlots)
-      .map((file) => ({ id: crypto.randomUUID(), url: URL.createObjectURL(file) }));
+      .map((file) => ({ id: crypto.randomUUID(), url: URL.createObjectURL(file), file }));
 
     if (newPhotos.length > 0) onChange([...photos, ...newPhotos]);
   }

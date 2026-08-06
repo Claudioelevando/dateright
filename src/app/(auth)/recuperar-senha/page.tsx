@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FieldError } from "@/components/shared/field-error";
 import { FormAlert } from "@/components/shared/form-alert";
+import { createClient } from "@/lib/supabase/client";
 
 const forgotPasswordSchema = z.object({
   email: z.string().min(1, "Informe seu e-mail.").email("Informe um e-mail válido."),
@@ -34,11 +35,15 @@ export default function RecuperarSenhaPage() {
     setServerError(null);
     setSuccess(false);
 
-    // Dados mockados — sem integração real ainda (M2).
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    const supabase = createClient();
+    const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
+      redirectTo: `${window.location.origin}/auth/callback?next=/atualizar-senha`,
+    });
 
-    if (values.email === "erro@teste.com") {
-      setServerError("Não encontramos uma conta com este e-mail.");
+    // Nunca revelamos se o e-mail existe ou não (evita enumeração de contas) — só
+    // mostramos erro em falhas genuínas do serviço (ex.: rate limit).
+    if (error && error.status !== 400) {
+      setServerError("Não foi possível enviar o e-mail agora. Tente novamente em instantes.");
       return;
     }
 
@@ -57,7 +62,7 @@ export default function RecuperarSenhaPage() {
         {serverError && <FormAlert variant="error">{serverError}</FormAlert>}
         {success && (
           <FormAlert variant="success">
-            Se este e-mail existir, um link de recuperação foi enviado (simulado).
+            Se este e-mail existir, um link de recuperação foi enviado.
           </FormAlert>
         )}
 
@@ -79,10 +84,6 @@ export default function RecuperarSenhaPage() {
             {isSubmitting && <Loader2 className="size-4 animate-spin" />}
             Enviar link de recuperação
           </Button>
-
-          <p className="text-muted-foreground text-center text-xs">
-            Dica: use <code className="font-mono">erro@teste.com</code> para simular um erro.
-          </p>
         </form>
 
         <Link
