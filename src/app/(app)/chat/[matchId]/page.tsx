@@ -74,6 +74,7 @@ export default function ChatPage() {
           </p>
         </div>
         <ReportBlockMenu
+          key={profile.id}
           profileId={profile.id}
           profileName={profile.name}
           onDone={() => router.push("/matches")}

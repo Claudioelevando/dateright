@@ -97,6 +97,7 @@ export const moderationRouter = router({
       const reports = await prisma.report.findMany({
         where: { status: input.status },
         orderBy: { createdAt: "asc" },
+        take: 100,
         include: {
           reporter: { include: { photos: { orderBy: { position: "asc" }, take: 1 } } },
           reported: { include: { photos: { orderBy: { position: "asc" }, take: 1 } } },

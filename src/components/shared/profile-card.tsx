@@ -50,6 +50,7 @@ export function ProfileCard({ profile, className, onBlocked }: ProfileCardProps)
 
       {id && (
         <ReportBlockMenu
+          key={id}
           profileId={id}
           profileName={name}
           onDone={onBlocked}

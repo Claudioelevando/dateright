@@ -16,31 +16,6 @@ function canonicalPair(a: string, b: string): [string, string] {
   return a < b ? [a, b] : [b, a];
 }
 
-export async function assertParticipant(matchId: string, userId: string) {
-  const match = await prisma.match.findUnique({ where: { id: matchId } });
-  if (!match) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Match não encontrado." });
-  }
-  if (match.userAId !== userId && match.userBId !== userId) {
-    throw new TRPCError({ code: "FORBIDDEN" });
-  }
-
-  const otherId = match.userAId === userId ? match.userBId : match.userAId;
-  const blocked = await prisma.block.findFirst({
-    where: {
-      OR: [
-        { blockerId: userId, blockedId: otherId },
-        { blockerId: otherId, blockedId: userId },
-      ],
-    },
-  });
-  if (blocked) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "Esta conversa não está mais disponível." });
-  }
-
-  return match;
-}
-
 async function isBlockedPair(userAId: string, userBId: string) {
   const blocked = await prisma.block.findFirst({
     where: {
@@ -51,6 +26,23 @@ async function isBlockedPair(userAId: string, userBId: string) {
     },
   });
   return blocked != null;
+}
+
+export async function assertParticipant(matchId: string, userId: string) {
+  const match = await prisma.match.findUnique({ where: { id: matchId } });
+  if (!match) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Match não encontrado." });
+  }
+  if (match.userAId !== userId && match.userBId !== userId) {
+    throw new TRPCError({ code: "FORBIDDEN" });
+  }
+
+  const otherId = match.userAId === userId ? match.userBId : match.userAId;
+  if (await isBlockedPair(userId, otherId)) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Esta conversa não está mais disponível." });
+  }
+
+  return match;
 }
 
 export const participantInclude = {
