@@ -5,7 +5,7 @@ import { calculateAge } from "@/lib/age";
 import { prisma } from "@/lib/db";
 import { boundingBox, distanceKm } from "@/lib/geo";
 import { calculateCompatibility, type CompatibilityAnswer } from "@/lib/matching/compatibility";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { signCoverPhoto } from "@/lib/storage";
 
 import { protectedProcedure, router } from "../trpc";
 
@@ -27,13 +27,6 @@ function birthDateBounds(minAge: number, maxAge: number, today: Date) {
 // string | string[] | number (ver comentário em prisma/schema.prisma).
 function toCompatibilityAnswer(answer: { questionId: string; value: unknown }): CompatibilityAnswer {
   return { questionId: answer.questionId, value: answer.value as string | string[] | number };
-}
-
-async function signCoverPhoto(storagePath: string | undefined) {
-  if (!storagePath) return [];
-  const admin = createAdminClient();
-  const { data } = await admin.storage.from("profile-photos").createSignedUrl(storagePath, 3600);
-  return data?.signedUrl ? [data.signedUrl] : [];
 }
 
 export const discoverRouter = router({

@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { calculateAge } from "@/lib/age";
 import { prisma } from "@/lib/db";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { signCoverPhoto } from "@/lib/storage";
 
 import { protectedProcedure, router } from "../trpc";
 
@@ -27,19 +27,12 @@ export async function assertParticipant(matchId: string, userId: string) {
   return match;
 }
 
-async function signCoverPhoto(storagePath: string | undefined) {
-  if (!storagePath) return [];
-  const admin = createAdminClient();
-  const { data } = await admin.storage.from("profile-photos").createSignedUrl(storagePath, 3600);
-  return data?.signedUrl ? [data.signedUrl] : [];
-}
-
-const participantInclude = {
+export const participantInclude = {
   photos: { orderBy: { position: "asc" as const }, take: 1 },
   interests: { include: { interest: true } },
 };
 
-async function toMatchParticipant(profile: {
+export async function toMatchParticipant(profile: {
   id: string;
   name: string;
   birthDate: Date;
