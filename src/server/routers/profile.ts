@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { calculateAge } from "@/lib/age";
 import { prisma } from "@/lib/db";
+import { geocodeCity } from "@/lib/geocoding";
 
 import { protectedProcedure, publicProcedure, router } from "../trpc";
 
@@ -60,7 +61,10 @@ export const profileRouter = router({
   }),
 
   completeOnboarding: protectedProcedure.input(onboardingInput).mutation(async ({ ctx, input }) => {
-    const interestIds = await resolveInterestIds(input.interestSlugs);
+    const [interestIds, coordinates] = await Promise.all([
+      resolveInterestIds(input.interestSlugs),
+      geocodeCity(input.city),
+    ]);
 
     return prisma.profile.upsert({
       where: { id: ctx.userId },
@@ -70,6 +74,8 @@ export const profileRouter = router({
         name: input.name,
         birthDate: input.birthDate,
         city: input.city,
+        latitude: coordinates?.latitude,
+        longitude: coordinates?.longitude,
         gender: input.gender,
         interestedIn: input.interestedIn,
         bio: input.bio,
@@ -83,6 +89,8 @@ export const profileRouter = router({
         name: input.name,
         birthDate: input.birthDate,
         city: input.city,
+        latitude: coordinates?.latitude,
+        longitude: coordinates?.longitude,
         gender: input.gender,
         interestedIn: input.interestedIn,
         bio: input.bio,

@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { calculateAge } from "@/lib/age";
 import { prisma } from "@/lib/db";
+import { boundingBox, distanceKm } from "@/lib/geo";
 import { calculateCompatibility, type CompatibilityAnswer } from "@/lib/matching/compatibility";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -52,15 +53,38 @@ export const discoverRouter = router({
     });
     const excludeIds = [ctx.userId, ...swiped.map((s) => s.swipedId)];
 
+    // Só filtramos por distância quando minha própria cidade foi geocodificada com sucesso
+    // (ver src/lib/geocoding.ts — best-effort, pode não ter coordenadas). Perfis candidatos sem
+    // coordenadas nunca são excluídos por distância: preferimos mostrá-los a esconder tudo numa
+    // base ainda pouco geocodificada.
+    const myCoordinates =
+      me.latitude != null && me.longitude != null ? { lat: me.latitude, lng: me.longitude } : null;
+    const box = myCoordinates ? boundingBox(myCoordinates, me.maxDistanceKm) : null;
+
     const candidates = await prisma.profile.findMany({
       where: {
-        id: { notIn: excludeIds },
-        onboardingCompletedAt: { not: null },
-        ...(me.interestedIn !== "AMBOS" ? { gender: me.interestedIn } : {}),
-        OR: [{ interestedIn: me.gender }, { interestedIn: "AMBOS" }],
-        ageRangeMin: { lte: myAge },
-        ageRangeMax: { gte: myAge },
-        birthDate: { gte: earliest, lte: latest },
+        AND: [
+          { id: { notIn: excludeIds } },
+          { onboardingCompletedAt: { not: null } },
+          ...(me.interestedIn !== "AMBOS" ? [{ gender: me.interestedIn }] : []),
+          { OR: [{ interestedIn: me.gender }, { interestedIn: "AMBOS" }] },
+          { ageRangeMin: { lte: myAge } },
+          { ageRangeMax: { gte: myAge } },
+          { birthDate: { gte: earliest, lte: latest } },
+          ...(box
+            ? [
+                {
+                  OR: [
+                    { latitude: null },
+                    {
+                      latitude: { gte: box.minLat, lte: box.maxLat },
+                      longitude: { gte: box.minLng, lte: box.maxLng },
+                    },
+                  ],
+                },
+              ]
+            : []),
+        ],
       },
       include: {
         photos: { orderBy: { position: "asc" }, take: 1 },
@@ -70,13 +94,23 @@ export const discoverRouter = router({
       orderBy: { createdAt: "desc" },
     });
 
-    if (candidates.length === 0) return [];
+    // O bounding box acima é um pré-filtro quadrado (mais barato no banco); o filtro exato por
+    // raio circular acontece aqui via Haversine, sobre o lote já reduzido.
+    const withinRadius = candidates.filter((candidate) => {
+      if (!myCoordinates || candidate.latitude == null || candidate.longitude == null) return true;
+      return (
+        distanceKm(myCoordinates, { lat: candidate.latitude, lng: candidate.longitude }) <=
+        me.maxDistanceKm
+      );
+    });
+
+    if (withinRadius.length === 0) return [];
 
     const [questions, myAnswers, candidateAnswers] = await Promise.all([
       prisma.questionnaireQuestion.findMany({ select: { id: true, type: true } }),
       prisma.questionnaireAnswer.findMany({ where: { profileId: ctx.userId } }),
       prisma.questionnaireAnswer.findMany({
-        where: { profileId: { in: candidates.map((c) => c.id) } },
+        where: { profileId: { in: withinRadius.map((c) => c.id) } },
       }),
     ]);
 
@@ -88,11 +122,15 @@ export const discoverRouter = router({
     }
 
     return Promise.all(
-      candidates.map(async (candidate) => ({
+      withinRadius.map(async (candidate) => ({
         id: candidate.id,
         name: candidate.name,
         age: calculateAge(candidate.birthDate),
         city: candidate.city,
+        distanceKm:
+          myCoordinates && candidate.latitude != null && candidate.longitude != null
+            ? Math.round(distanceKm(myCoordinates, { lat: candidate.latitude, lng: candidate.longitude }))
+            : undefined,
         bio: candidate.bio ?? undefined,
         photos: await signCoverPhoto(candidate.photos[0]?.storagePath),
         interests: candidate.interests.map((ci) => ci.interest.label),
