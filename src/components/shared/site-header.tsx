@@ -10,6 +10,7 @@ import { ThemeToggle } from "@/components/shared/theme-toggle";
 const navItems = [
   { href: "/", label: "Início" },
   { href: "/onboarding", label: "Onboarding" },
+  { href: "/questionnaire", label: "Questionário" },
   { href: "/profile", label: "Perfil" },
   { href: "/design-system", label: "Design System" },
 ];
