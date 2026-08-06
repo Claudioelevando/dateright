@@ -103,7 +103,8 @@ function PremiumPageContent() {
       <div className="mb-6 space-y-3">
         {checkoutStatus === "success" && (
           <FormAlert variant="success">
-            Pagamento confirmado! Sua assinatura pode levar alguns segundos para ativar.
+            Checkout concluído! Estamos confirmando seu pagamento — sua assinatura ativa em poucos
+            segundos.
           </FormAlert>
         )}
         {checkoutStatus === "cancelled" && (
