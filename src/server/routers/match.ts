@@ -16,6 +16,17 @@ function canonicalPair(a: string, b: string): [string, string] {
   return a < b ? [a, b] : [b, a];
 }
 
+export async function assertParticipant(matchId: string, userId: string) {
+  const match = await prisma.match.findUnique({ where: { id: matchId } });
+  if (!match) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Match não encontrado." });
+  }
+  if (match.userAId !== userId && match.userBId !== userId) {
+    throw new TRPCError({ code: "FORBIDDEN" });
+  }
+  return match;
+}
+
 async function signCoverPhoto(storagePath: string | undefined) {
   if (!storagePath) return [];
   const admin = createAdminClient();
@@ -54,7 +65,15 @@ export const matchRouter = router({
       throw new TRPCError({ code: "BAD_REQUEST", message: "Não é possível curtir o próprio perfil." });
     }
 
+    const [lockA, lockB] = canonicalPair(ctx.userId, input.targetProfileId);
+
     return prisma.$transaction(async (tx) => {
+      // Lock por par canonicalizado: sem isso, dois swipes recíprocos quase simultâneos
+      // podem cada um ler o swipe do outro ainda não commitado e concluir "sem match" —
+      // o lock serializa as duas transações desse par, garantindo que a segunda enxergue
+      // o swipe da primeira já commitado.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`${lockA}:${lockB}`}, 0))`;
+
       const target = await tx.profile.findUnique({
         where: { id: input.targetProfileId },
         select: { id: true },
@@ -116,19 +135,15 @@ export const matchRouter = router({
   getById: protectedProcedure
     .input(z.object({ matchId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      const match = await prisma.match.findUnique({
+      await assertParticipant(input.matchId, ctx.userId);
+
+      const match = await prisma.match.findUniqueOrThrow({
         where: { id: input.matchId },
         include: {
           userA: { include: participantInclude },
           userB: { include: participantInclude },
         },
       });
-      if (!match) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Match não encontrado." });
-      }
-      if (match.userAId !== ctx.userId && match.userBId !== ctx.userId) {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
 
       const other = match.userAId === ctx.userId ? match.userB : match.userA;
       return {

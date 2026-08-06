@@ -123,6 +123,10 @@ export const profileRouter = router({
   addPhoto: protectedProcedure
     .input(z.object({ storagePath: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
+      if (!input.storagePath.startsWith(`${ctx.userId}/`)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Caminho de foto inválido." });
+      }
+
       const count = await prisma.profilePhoto.count({ where: { profileId: ctx.userId } });
       if (count >= 6) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Máximo de 6 fotos por perfil." });
