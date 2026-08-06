@@ -10,6 +10,7 @@ import { ProfileCard } from "@/components/shared/profile-card";
 import { trpc } from "@/lib/trpc/client";
 
 export default function MatchesPage() {
+  const utils = trpc.useUtils();
   const { data: matches, isLoading } = trpc.match.listMatches.useQuery();
 
   if (isLoading) {
@@ -28,7 +29,11 @@ export default function MatchesPage() {
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
           {matches.map((match) => (
             <Link key={match.matchId} href={`/chat/${match.matchId}`} className="block">
-              <ProfileCard profile={match.profile} className="aspect-square" />
+              <ProfileCard
+                profile={match.profile}
+                className="aspect-square"
+                onBlocked={() => utils.match.listMatches.invalidate()}
+              />
             </Link>
           ))}
         </div>

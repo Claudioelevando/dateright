@@ -7,7 +7,7 @@ import { boundingBox, distanceKm } from "@/lib/geo";
 import { calculateCompatibility, type CompatibilityAnswer } from "@/lib/matching/compatibility";
 import { signCoverPhoto } from "@/lib/storage";
 
-import { protectedProcedure, router } from "../trpc";
+import { activeProcedure, router } from "../trpc";
 
 const getCandidatesInput = z.object({
   limit: z.number().int().min(1).max(50).default(20),
@@ -30,7 +30,7 @@ function toCompatibilityAnswer(answer: { questionId: string; value: unknown }): 
 }
 
 export const discoverRouter = router({
-  getCandidates: protectedProcedure.input(getCandidatesInput).query(async ({ ctx, input }) => {
+  getCandidates: activeProcedure.input(getCandidatesInput).query(async ({ ctx, input }) => {
     const me = await prisma.profile.findUnique({ where: { id: ctx.userId } });
     if (!me) {
       throw new TRPCError({ code: "NOT_FOUND", message: "Complete seu perfil primeiro." });
@@ -40,11 +40,15 @@ export const discoverRouter = router({
     const today = new Date();
     const { earliest, latest } = birthDateBounds(me.ageRangeMin, me.ageRangeMax, today);
 
-    const swiped = await prisma.swipe.findMany({
-      where: { swiperId: ctx.userId },
-      select: { swipedId: true },
-    });
-    const excludeIds = [ctx.userId, ...swiped.map((s) => s.swipedId)];
+    const [swiped, blocks] = await Promise.all([
+      prisma.swipe.findMany({ where: { swiperId: ctx.userId }, select: { swipedId: true } }),
+      prisma.block.findMany({
+        where: { OR: [{ blockerId: ctx.userId }, { blockedId: ctx.userId }] },
+        select: { blockerId: true, blockedId: true },
+      }),
+    ]);
+    const blockedIds = blocks.map((b) => (b.blockerId === ctx.userId ? b.blockedId : b.blockerId));
+    const excludeIds = [ctx.userId, ...swiped.map((s) => s.swipedId), ...blockedIds];
 
     // Só filtramos por distância quando minha própria cidade foi geocodificada com sucesso
     // (ver src/lib/geocoding.ts — best-effort, pode não ter coordenadas). Perfis candidatos sem
@@ -59,6 +63,7 @@ export const discoverRouter = router({
         AND: [
           { id: { notIn: excludeIds } },
           { onboardingCompletedAt: { not: null } },
+          { suspendedAt: null },
           ...(me.interestedIn !== "AMBOS" ? [{ gender: me.interestedIn }] : []),
           { OR: [{ interestedIn: me.gender }, { interestedIn: "AMBOS" }] },
           { ageRangeMin: { lte: myAge } },

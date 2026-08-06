@@ -5,7 +5,7 @@ import { calculateAge } from "@/lib/age";
 import { prisma } from "@/lib/db";
 import { signCoverPhoto } from "@/lib/storage";
 
-import { protectedProcedure, router } from "../trpc";
+import { activeProcedure, router } from "../trpc";
 
 const swipeInput = z.object({
   targetProfileId: z.string().uuid(),
@@ -24,7 +24,33 @@ export async function assertParticipant(matchId: string, userId: string) {
   if (match.userAId !== userId && match.userBId !== userId) {
     throw new TRPCError({ code: "FORBIDDEN" });
   }
+
+  const otherId = match.userAId === userId ? match.userBId : match.userAId;
+  const blocked = await prisma.block.findFirst({
+    where: {
+      OR: [
+        { blockerId: userId, blockedId: otherId },
+        { blockerId: otherId, blockedId: userId },
+      ],
+    },
+  });
+  if (blocked) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Esta conversa não está mais disponível." });
+  }
+
   return match;
+}
+
+async function isBlockedPair(userAId: string, userBId: string) {
+  const blocked = await prisma.block.findFirst({
+    where: {
+      OR: [
+        { blockerId: userAId, blockedId: userBId },
+        { blockerId: userBId, blockedId: userAId },
+      ],
+    },
+  });
+  return blocked != null;
 }
 
 export const participantInclude = {
@@ -53,9 +79,16 @@ export async function toMatchParticipant(profile: {
 }
 
 export const matchRouter = router({
-  swipe: protectedProcedure.input(swipeInput).mutation(async ({ ctx, input }) => {
+  swipe: activeProcedure.input(swipeInput).mutation(async ({ ctx, input }) => {
     if (input.targetProfileId === ctx.userId) {
       throw new TRPCError({ code: "BAD_REQUEST", message: "Não é possível curtir o próprio perfil." });
+    }
+
+    // Verificado fora da transação (o par bloqueado já foi excluído da descoberta — isso é
+    // só uma defesa contra um client com um id de candidato obtido antes do bloqueio).
+    // NOT_FOUND, não FORBIDDEN, pra não revelar que houve bloqueio.
+    if (await isBlockedPair(ctx.userId, input.targetProfileId)) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Perfil não encontrado." });
     }
 
     const [lockA, lockB] = canonicalPair(ctx.userId, input.targetProfileId);
@@ -103,29 +136,43 @@ export const matchRouter = router({
     });
   }),
 
-  listMatches: protectedProcedure.query(async ({ ctx }) => {
-    const matches = await prisma.match.findMany({
-      where: { OR: [{ userAId: ctx.userId }, { userBId: ctx.userId }] },
-      orderBy: { createdAt: "desc" },
-      include: {
-        userA: { include: participantInclude },
-        userB: { include: participantInclude },
-      },
-    });
+  listMatches: activeProcedure.query(async ({ ctx }) => {
+    const [matches, blocks] = await Promise.all([
+      prisma.match.findMany({
+        where: { OR: [{ userAId: ctx.userId }, { userBId: ctx.userId }] },
+        orderBy: { createdAt: "desc" },
+        include: {
+          userA: { include: participantInclude },
+          userB: { include: participantInclude },
+        },
+      }),
+      prisma.block.findMany({
+        where: { OR: [{ blockerId: ctx.userId }, { blockedId: ctx.userId }] },
+        select: { blockerId: true, blockedId: true },
+      }),
+    ]);
+    const blockedIds = new Set(
+      blocks.map((b) => (b.blockerId === ctx.userId ? b.blockedId : b.blockerId)),
+    );
 
     return Promise.all(
-      matches.map(async (match) => {
-        const other = match.userAId === ctx.userId ? match.userB : match.userA;
-        return {
-          matchId: match.id,
-          matchedAt: match.createdAt,
-          profile: await toMatchParticipant(other),
-        };
-      }),
+      matches
+        .filter((match) => {
+          const otherId = match.userAId === ctx.userId ? match.userBId : match.userAId;
+          return !blockedIds.has(otherId);
+        })
+        .map(async (match) => {
+          const other = match.userAId === ctx.userId ? match.userB : match.userA;
+          return {
+            matchId: match.id,
+            matchedAt: match.createdAt,
+            profile: await toMatchParticipant(other),
+          };
+        }),
     );
   }),
 
-  getById: protectedProcedure
+  getById: activeProcedure
     .input(z.object({ matchId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       await assertParticipant(input.matchId, ctx.userId);

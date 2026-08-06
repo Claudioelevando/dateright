@@ -1,6 +1,8 @@
+import { adminRouter } from "./admin";
 import { discoverRouter } from "./discover";
 import { matchRouter } from "./match";
 import { messageRouter } from "./message";
+import { moderationRouter } from "./moderation";
 import { premiumRouter } from "./premium";
 import { profileRouter } from "./profile";
 import { questionnaireRouter } from "./questionnaire";
@@ -13,6 +15,8 @@ export const appRouter = router({
   match: matchRouter,
   message: messageRouter,
   premium: premiumRouter,
+  moderation: moderationRouter,
+  admin: adminRouter,
 });
 
 export type AppRouter = typeof appRouter;

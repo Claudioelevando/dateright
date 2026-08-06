@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { MapPin, MessageCircle, Send } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -9,11 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/shared/empty-state";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
+import { ReportBlockMenu } from "@/components/shared/report-block-menu";
 import { MessageList } from "@/components/chat/message-list";
 import { trpc } from "@/lib/trpc/client";
 
 export default function ChatPage() {
   const { matchId } = useParams<{ matchId: string }>();
+  const router = useRouter();
   const [body, setBody] = useState("");
 
   const { data: match, isLoading: matchLoading, error: matchError } = trpc.match.getById.useQuery({
@@ -71,6 +73,12 @@ export default function ChatPage() {
             {profile.city}
           </p>
         </div>
+        <ReportBlockMenu
+          profileId={profile.id}
+          profileName={profile.name}
+          onDone={() => router.push("/matches")}
+          className="ml-auto"
+        />
       </div>
 
       {messages.length === 0 ? (

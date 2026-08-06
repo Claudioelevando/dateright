@@ -27,6 +27,9 @@ model Profile {
   isPremium             Boolean   @default(false)
   stripeCustomerId      String?   @unique
   stripeSubscriptionId  String?   @unique
+  role                  Role      @default(USER)
+  suspendedAt           DateTime?
+  suspendedReason       String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
@@ -40,6 +43,12 @@ model Profile {
   matchesAsB     Match[] @relation("MatchesAsB")
   messagesSent   Message[] @relation("MessagesSent")
 
+  reportsFiled    Report[] @relation("ReportsFiled")
+  reportsReceived Report[] @relation("ReportsReceived")
+  reportsReviewed Report[] @relation("ReportsReviewed")
+  blocksGiven     Block[]  @relation("BlocksGiven")
+  blocksReceived  Block[]  @relation("BlocksReceived")
+
   @@map("profiles")
 }
 
@@ -52,6 +61,12 @@ enum InterestedIn {
   MASCULINO
   FEMININO
   AMBOS
+}
+
+enum Role {
+  USER
+  MODERATOR
+  ADMIN
 }
 
 model ProfilePhoto {
@@ -177,4 +192,57 @@ model Message {
   // Sem readAt: confirmação de leitura fica para um milestone futuro.
   @@index([matchId, createdAt])
   @@map("messages")
+}
+
+enum ReportReason {
+  FAKE_PROFILE
+  INAPPROPRIATE_CONTENT
+  HARASSMENT
+  SCAM
+  MINOR
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  DISMISSED
+  ACTIONED
+}
+
+model Report {
+  id             String       @id @default(uuid()) @db.Uuid
+  reporterId     String       @db.Uuid
+  reportedId     String       @db.Uuid
+  reason         ReportReason
+  details        String?
+  status         ReportStatus @default(PENDING)
+  reviewedById   String?      @db.Uuid
+  reviewedAt     DateTime?
+  resolutionNote String?
+  createdAt      DateTime     @default(now())
+
+  reporter   Profile  @relation("ReportsFiled", fields: [reporterId], references: [id], onDelete: Cascade)
+  reported   Profile  @relation("ReportsReceived", fields: [reportedId], references: [id], onDelete: Cascade)
+  reviewedBy Profile? @relation("ReportsReviewed", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([reportedId])
+  @@map("reports")
+}
+
+// blockerId "não vê mais" blockedId (descoberta/match/chat) — unidirecional por natureza,
+// mas assertParticipant/discover checam nos dois sentidos: quem bloqueou não deve ver quem
+// foi bloqueado, e vice-versa.
+model Block {
+  id        String   @id @default(uuid()) @db.Uuid
+  blockerId String   @db.Uuid
+  blockedId String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  blocker Profile @relation("BlocksGiven", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked Profile @relation("BlocksReceived", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+  @@map("blocks")
 }

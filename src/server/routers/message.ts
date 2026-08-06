@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 
 import { assertParticipant } from "./match";
-import { protectedProcedure, router } from "../trpc";
+import { activeProcedure, router } from "../trpc";
 
 const listInput = z.object({ matchId: z.string().uuid() });
 
@@ -13,7 +13,7 @@ const sendInput = z.object({
 });
 
 export const messageRouter = router({
-  list: protectedProcedure.input(listInput).query(async ({ ctx, input }) => {
+  list: activeProcedure.input(listInput).query(async ({ ctx, input }) => {
     await assertParticipant(input.matchId, ctx.userId);
 
     const messages = await prisma.message.findMany({
@@ -30,7 +30,7 @@ export const messageRouter = router({
     }));
   }),
 
-  send: protectedProcedure.input(sendInput).mutation(async ({ ctx, input }) => {
+  send: activeProcedure.input(sendInput).mutation(async ({ ctx, input }) => {
     await assertParticipant(input.matchId, ctx.userId);
 
     const message = await prisma.message.create({

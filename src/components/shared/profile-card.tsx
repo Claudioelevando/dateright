@@ -1,9 +1,11 @@
 import { MapPin } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { ReportBlockMenu } from "@/components/shared/report-block-menu";
 import { cn } from "@/lib/utils";
 
 interface ProfileCardData {
+  id?: string;
   name: string;
   age: number;
   city?: string;
@@ -17,10 +19,11 @@ interface ProfileCardData {
 interface ProfileCardProps {
   profile: ProfileCardData;
   className?: string;
+  onBlocked?: () => void;
 }
 
-export function ProfileCard({ profile, className }: ProfileCardProps) {
-  const { name, age, city, distanceKm, bio, photos, interests, compatibility } = profile;
+export function ProfileCard({ profile, className, onBlocked }: ProfileCardProps) {
+  const { id, name, age, city, distanceKm, bio, photos, interests, compatibility } = profile;
   const coverPhoto = photos[0];
 
   return (
@@ -43,6 +46,16 @@ export function ProfileCard({ profile, className }: ProfileCardProps) {
 
       {typeof compatibility === "number" && (
         <Badge className="absolute top-3 right-3">{compatibility}% compatível</Badge>
+      )}
+
+      {id && (
+        <ReportBlockMenu
+          profileId={id}
+          profileName={name}
+          onDone={onBlocked}
+          overlay
+          className="absolute top-3 left-3"
+        />
       )}
 
       <div className="relative mt-auto space-y-2 p-4 text-white">
