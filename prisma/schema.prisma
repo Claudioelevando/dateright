@@ -24,6 +24,9 @@ model Profile {
   ageRangeMax           Int       @default(99)
   maxDistanceKm         Int       @default(50)
   onboardingCompletedAt DateTime?
+  isPremium             Boolean   @default(false)
+  stripeCustomerId      String?   @unique
+  stripeSubscriptionId  String?   @unique
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 

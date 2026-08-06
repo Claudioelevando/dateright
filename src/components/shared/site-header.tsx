@@ -16,6 +16,7 @@ const navItems = [
   { href: "/questionnaire", label: "Questionário" },
   { href: "/discover", label: "Descobrir" },
   { href: "/matches", label: "Matches" },
+  { href: "/premium", label: "Premium" },
   { href: "/profile", label: "Perfil" },
   { href: "/design-system", label: "Design System" },
 ];
