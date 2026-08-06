@@ -16,6 +16,17 @@ function canonicalPair(a: string, b: string): [string, string] {
   return a < b ? [a, b] : [b, a];
 }
 
+export async function assertParticipant(matchId: string, userId: string) {
+  const match = await prisma.match.findUnique({ where: { id: matchId } });
+  if (!match) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Match não encontrado." });
+  }
+  if (match.userAId !== userId && match.userBId !== userId) {
+    throw new TRPCError({ code: "FORBIDDEN" });
+  }
+  return match;
+}
+
 async function signCoverPhoto(storagePath: string | undefined) {
   if (!storagePath) return [];
   const admin = createAdminClient();
@@ -116,19 +127,15 @@ export const matchRouter = router({
   getById: protectedProcedure
     .input(z.object({ matchId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      const match = await prisma.match.findUnique({
+      await assertParticipant(input.matchId, ctx.userId);
+
+      const match = await prisma.match.findUniqueOrThrow({
         where: { id: input.matchId },
         include: {
           userA: { include: participantInclude },
           userB: { include: participantInclude },
         },
       });
-      if (!match) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Match não encontrado." });
-      }
-      if (match.userAId !== ctx.userId && match.userBId !== ctx.userId) {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
 
       const other = match.userAId === ctx.userId ? match.userB : match.userA;
       return {
