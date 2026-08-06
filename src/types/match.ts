@@ -3,6 +3,7 @@ export interface CandidateProfile {
   name: string;
   age: number;
   city: string;
+  distanceKm?: number;
   bio?: string;
   photos: string[];
   interests: string[];

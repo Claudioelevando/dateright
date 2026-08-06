@@ -15,6 +15,8 @@ model Profile {
   name                  String
   birthDate             DateTime  @db.Date
   city                  String
+  latitude              Float?
+  longitude             Float?
   bio                   String?
   gender                Gender
   interestedIn          InterestedIn

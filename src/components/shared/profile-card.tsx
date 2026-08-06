@@ -7,6 +7,7 @@ interface ProfileCardData {
   name: string;
   age: number;
   city?: string;
+  distanceKm?: number;
   bio?: string;
   photos: string[];
   interests?: string[];
@@ -19,7 +20,7 @@ interface ProfileCardProps {
 }
 
 export function ProfileCard({ profile, className }: ProfileCardProps) {
-  const { name, age, city, bio, photos, interests, compatibility } = profile;
+  const { name, age, city, distanceKm, bio, photos, interests, compatibility } = profile;
   const coverPhoto = photos[0];
 
   return (
@@ -53,6 +54,7 @@ export function ProfileCard({ profile, className }: ProfileCardProps) {
           <p className="flex items-center gap-1 text-sm text-white/80">
             <MapPin className="size-3.5" />
             {city}
+            {typeof distanceKm === "number" && ` · ${distanceKm} km`}
           </p>
         )}
         {bio && <p className="line-clamp-2 text-sm text-white/90">{bio}</p>}
