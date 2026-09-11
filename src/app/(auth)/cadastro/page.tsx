@@ -50,7 +50,10 @@ export default function CadastroPage() {
     const { data, error } = await supabase.auth.signUp({
       email: values.email,
       password: values.password,
-      options: { data: { name: values.name } },
+      options: {
+        data: { name: values.name },
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/onboarding`,
+      },
     });
 
     if (error) {

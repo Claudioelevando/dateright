@@ -37,7 +37,7 @@ export default function RecuperarSenhaPage() {
 
     const supabase = createClient();
     const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/atualizar-senha`,
+      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/atualizar-senha`,
     });
 
     // Nunca revelamos se o e-mail existe ou não (evita enumeração de contas) — só

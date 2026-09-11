@@ -52,7 +52,7 @@ export function SiteHeader() {
           </Link>
 
           {!isAuthRoute && (
-            <nav className="flex items-center gap-1">
+            <nav className="scrollbar-none flex min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain [touch-action:pan-x]">
               {[...navItems, ...staffNavItems].map((item) => {
                 const isActive = pathname === item.href;
                 return (
@@ -61,7 +61,7 @@ export function SiteHeader() {
                     href={item.href}
                     aria-current={isActive ? "page" : undefined}
                     className={cn(
-                      "rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                      "shrink-0 rounded-lg px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors",
                       isActive
                         ? "bg-muted text-foreground"
                         : "text-muted-foreground hover:bg-muted hover:text-foreground",
