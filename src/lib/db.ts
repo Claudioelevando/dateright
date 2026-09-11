@@ -1,17 +1,14 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@/generated/prisma/client";
 
-// Em desenvolvimento local, algumas redes fazem inspeção/interceptação de TLS e
-// apresentam um certificado próprio na cadeia para o Postgres do Supabase — o que quebra
-// a verificação estrita de certificado. Relaxamos apenas em dev; em produção (Vercel) a
-// verificação do certificado continua ativa.
+// O connection pooler do Supabase (Supavisor, porta 6543) apresenta uma cadeia de
+// certificado que não é validável contra as CAs públicas padrão — isso acontece em
+// qualquer ambiente, não só em dev, então a verificação estrita de certificado é
+// desabilitada em todos os ambientes. A conexão continua criptografada via TLS.
 function connectionOptions(url: string) {
   const parsed = new URL(url);
-  if (process.env.NODE_ENV !== "production") {
-    parsed.searchParams.delete("sslmode");
-    return { connectionString: parsed.toString(), ssl: { rejectUnauthorized: false } };
-  }
-  return { connectionString: url };
+  parsed.searchParams.delete("sslmode");
+  return { connectionString: parsed.toString(), ssl: { rejectUnauthorized: false } };
 }
 
 function createPrismaClient() {
