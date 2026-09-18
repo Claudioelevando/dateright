@@ -3,13 +3,14 @@ import type { FetchCreateContextFnOptions } from "@trpc/server/adapters/fetch";
 import { prisma } from "@/lib/db";
 import { createClient } from "@/lib/supabase/server";
 
-// x-forwarded-for pode trazer uma cadeia de proxies ("client, proxy1, proxy2") — o primeiro
-// endereço é o do cliente original. Confiável aqui porque só a borda da Vercel escreve esse
-// header antes de chegar na função.
+// A Vercel sobrescreve x-forwarded-for/x-real-ip na borda com o IP real da conexão e não
+// repassa valores vindos do cliente (https://vercel.com/docs/headers/request-headers#x-forwarded-for)
+// — não é um header forjável aqui como seria atrás de um proxy genérico.
 function getClientIp(req: Request) {
+  const realIp = req.headers.get("x-real-ip");
+  if (realIp) return realIp.trim();
   const forwardedFor = req.headers.get("x-forwarded-for");
-  if (forwardedFor) return forwardedFor.split(",")[0]!.trim();
-  return req.headers.get("x-real-ip") ?? "unknown";
+  return forwardedFor ? forwardedFor.split(",")[0]!.trim() : "unknown";
 }
 
 export async function createContext({ req }: FetchCreateContextFnOptions) {
