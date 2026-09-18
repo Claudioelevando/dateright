@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { prisma } from "@/lib/db";
+import { sendPushToProfile } from "@/lib/notifications/push";
 
 import { assertParticipant } from "./match";
 import { activeProcedure, router } from "../trpc";
@@ -31,10 +32,20 @@ export const messageRouter = router({
   }),
 
   send: activeProcedure.input(sendInput).mutation(async ({ ctx, input }) => {
-    await assertParticipant(input.matchId, ctx.userId);
+    const match = await assertParticipant(input.matchId, ctx.userId);
 
-    const message = await prisma.message.create({
-      data: { matchId: input.matchId, senderId: ctx.userId, body: input.body },
+    const [message, sender] = await Promise.all([
+      prisma.message.create({
+        data: { matchId: input.matchId, senderId: ctx.userId, body: input.body },
+      }),
+      prisma.profile.findUnique({ where: { id: ctx.userId }, select: { name: true } }),
+    ]);
+
+    const otherId = match.userAId === ctx.userId ? match.userBId : match.userAId;
+    await sendPushToProfile(otherId, {
+      title: sender?.name ?? "Nova mensagem",
+      body: input.body.length > 100 ? `${input.body.slice(0, 100)}…` : input.body,
+      url: `/chat/${input.matchId}`,
     });
 
     return {

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { calculateAge } from "@/lib/age";
 import { prisma } from "@/lib/db";
 import { geocodeCity } from "@/lib/geocoding";
+import { sendWelcomeEmail } from "@/lib/notifications/email";
 
 import { protectedProcedure, publicProcedure, router } from "../trpc";
 
@@ -61,12 +62,13 @@ export const profileRouter = router({
   }),
 
   completeOnboarding: protectedProcedure.input(onboardingInput).mutation(async ({ ctx, input }) => {
-    const [interestIds, coordinates] = await Promise.all([
+    const [interestIds, coordinates, existing] = await Promise.all([
       resolveInterestIds(input.interestSlugs),
       geocodeCity(input.city),
+      prisma.profile.findUnique({ where: { id: ctx.userId }, select: { id: true } }),
     ]);
 
-    return prisma.profile.upsert({
+    const profile = await prisma.profile.upsert({
       where: { id: ctx.userId },
       create: {
         id: ctx.userId,
@@ -103,6 +105,12 @@ export const profileRouter = router({
         },
       },
     });
+
+    if (!existing) {
+      await sendWelcomeEmail(profile.email, profile.name);
+    }
+
+    return profile;
   }),
 
   updatePreferences: protectedProcedure.input(preferencesInput).mutation(async ({ ctx, input }) => {
