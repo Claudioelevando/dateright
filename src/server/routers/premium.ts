@@ -6,7 +6,11 @@ import { stripe } from "@/lib/stripe";
 import { participantInclude, toMatchParticipant } from "./match";
 import { protectedProcedure, router } from "../trpc";
 
-async function getOrCreateStripeCustomerId(profile: { id: string; email: string; stripeCustomerId: string | null }) {
+async function getOrCreateStripeCustomerId(profile: {
+  id: string;
+  email: string;
+  stripeCustomerId: string | null;
+}) {
   if (profile.stripeCustomerId) return profile.stripeCustomerId;
 
   const customer = await stripe.customers.create({
@@ -45,7 +49,10 @@ export const premiumRouter = router({
     });
 
     if (!session.url) {
-      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Não foi possível iniciar o checkout." });
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Não foi possível iniciar o checkout.",
+      });
     }
 
     return { url: session.url };

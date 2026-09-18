@@ -46,7 +46,11 @@ export default function ReportsPage() {
     <div>
       <h1 className="mb-6 text-2xl font-semibold">Moderação</h1>
 
-      <Tabs value={status} onValueChange={(value) => setStatus(value as typeof status)} className="mb-6">
+      <Tabs
+        value={status}
+        onValueChange={(value) => setStatus(value as typeof status)}
+        className="mb-6"
+      >
         <TabsList>
           {STATUS_TABS.map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value}>
@@ -89,9 +93,13 @@ export default function ReportsPage() {
                   <Flag className="text-destructive size-3.5" />
                   {REASON_LABELS[report.reason] ?? report.reason}
                 </p>
-                {report.details && <p className="text-muted-foreground text-sm">{report.details}</p>}
+                {report.details && (
+                  <p className="text-muted-foreground text-sm">{report.details}</p>
+                )}
                 {report.resolutionNote && (
-                  <p className="text-muted-foreground text-sm italic">Nota: {report.resolutionNote}</p>
+                  <p className="text-muted-foreground text-sm italic">
+                    Nota: {report.resolutionNote}
+                  </p>
                 )}
 
                 {status === "PENDING" && (

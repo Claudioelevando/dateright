@@ -94,7 +94,12 @@ export function ReportBlockMenu({
 
   function handleReportSubmit(event: React.FormEvent) {
     event.preventDefault();
-    createReport.mutate({ reportedProfileId: profileId, reason, details: details || undefined, alsoBlock });
+    createReport.mutate({
+      reportedProfileId: profileId,
+      reason,
+      details: details || undefined,
+      alsoBlock,
+    });
   }
 
   return (
@@ -139,7 +144,9 @@ export function ReportBlockMenu({
             </DialogHeader>
             <div className="space-y-4 py-2">
               {createReport.isError && (
-                <FormAlert variant="error">Não foi possível enviar a denúncia. Tente novamente.</FormAlert>
+                <FormAlert variant="error">
+                  Não foi possível enviar a denúncia. Tente novamente.
+                </FormAlert>
               )}
               <Select value={reason} onValueChange={(value) => setReason(value as typeof reason)}>
                 <SelectTrigger className="w-full">
@@ -189,13 +196,16 @@ export function ReportBlockMenu({
             <AlertDialogTitle>Bloquear {profileName}?</AlertDialogTitle>
             <AlertDialogDescription>
               {profileName} não vai mais aparecer pra você, e vocês não vão mais poder trocar
-              mensagens. Você pode desbloquear a qualquer momento em &quot;Perfis bloqueados&quot; no
-              seu perfil.
+              mensagens. Você pode desbloquear a qualquer momento em &quot;Perfis bloqueados&quot;
+              no seu perfil.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction disabled={block.isPending} onClick={() => block.mutate({ profileId })}>
+            <AlertDialogAction
+              disabled={block.isPending}
+              onClick={() => block.mutate({ profileId })}
+            >
               {block.isPending && <Loader2 className="size-4 animate-spin" />}
               Bloquear
             </AlertDialogAction>

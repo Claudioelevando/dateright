@@ -19,7 +19,10 @@ export async function createContext({ req }: FetchCreateContextFnOptions) {
   const userId = (data?.claims?.sub as string | undefined) ?? null;
 
   const profile = userId
-    ? await prisma.profile.findUnique({ where: { id: userId }, select: { role: true, suspendedAt: true } })
+    ? await prisma.profile.findUnique({
+        where: { id: userId },
+        select: { role: true, suspendedAt: true },
+      })
     : null;
 
   return {

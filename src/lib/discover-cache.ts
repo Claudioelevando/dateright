@@ -27,7 +27,10 @@ function cacheKey(userId: string) {
   return `discover:candidates:${userId}`;
 }
 
-export async function getCachedCandidates(userId: string, limit: number): Promise<Candidates | null> {
+export async function getCachedCandidates(
+  userId: string,
+  limit: number,
+): Promise<Candidates | null> {
   const cached = await redis.get<{ limit: number; candidates: Candidates }>(cacheKey(userId));
   // Um limit diferente do que foi cacheado não é um subconjunto seguro de reaproveitar
   // (menos candidatos cacheados não cobre um limit maior) — trata como cache miss.

@@ -22,7 +22,11 @@ export async function POST(request: NextRequest) {
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(body, signature ?? "", process.env.STRIPE_WEBHOOK_SECRET!);
+    event = stripe.webhooks.constructEvent(
+      body,
+      signature ?? "",
+      process.env.STRIPE_WEBHOOK_SECRET!,
+    );
   } catch (err) {
     console.error("Webhook Stripe: assinatura inválida.", err);
     return NextResponse.json({ error: "Assinatura inválida." }, { status: 400 });
@@ -47,7 +51,9 @@ export async function POST(request: NextRequest) {
             data: { ...data, stripeCustomerId: session.customer },
           });
         } else if (!found) {
-          console.error(`Webhook Stripe: nenhum profile encontrado para stripeCustomerId=${session.customer}`);
+          console.error(
+            `Webhook Stripe: nenhum profile encontrado para stripeCustomerId=${session.customer}`,
+          );
         }
       }
       break;
@@ -59,7 +65,9 @@ export async function POST(request: NextRequest) {
           isPremium: ["active", "trialing"].includes(subscription.status),
         });
         if (!found) {
-          console.error(`Webhook Stripe: nenhum profile encontrado para stripeCustomerId=${subscription.customer}`);
+          console.error(
+            `Webhook Stripe: nenhum profile encontrado para stripeCustomerId=${subscription.customer}`,
+          );
         }
       }
       break;
@@ -69,7 +77,9 @@ export async function POST(request: NextRequest) {
       if (typeof subscription.customer === "string") {
         const found = await setPremiumByCustomerId(subscription.customer, { isPremium: false });
         if (!found) {
-          console.error(`Webhook Stripe: nenhum profile encontrado para stripeCustomerId=${subscription.customer}`);
+          console.error(
+            `Webhook Stripe: nenhum profile encontrado para stripeCustomerId=${subscription.customer}`,
+          );
         }
       }
       break;

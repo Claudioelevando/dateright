@@ -10,7 +10,11 @@ export interface CompatibilityAnswer {
   value: string | string[] | number;
 }
 
-function similarity(type: QuestionKind, a: string | string[] | number, b: string | string[] | number) {
+function similarity(
+  type: QuestionKind,
+  a: string | string[] | number,
+  b: string | string[] | number,
+) {
   if (type === "SCALE" && typeof a === "number" && typeof b === "number") {
     return 1 - Math.abs(a - b) / 4;
   }

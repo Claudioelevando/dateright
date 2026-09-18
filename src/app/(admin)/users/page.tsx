@@ -36,8 +36,14 @@ export default function UsersPage() {
   const [reasonByUser, setReasonByUser] = useState<Record<string, string>>({});
 
   const utils = trpc.useUtils();
-  const { data: users, isLoading, error } = trpc.admin.listUsers.useQuery({ search: search || undefined });
-  const setRole = trpc.admin.setRole.useMutation({ onSuccess: () => utils.admin.listUsers.invalidate() });
+  const {
+    data: users,
+    isLoading,
+    error,
+  } = trpc.admin.listUsers.useQuery({ search: search || undefined });
+  const setRole = trpc.admin.setRole.useMutation({
+    onSuccess: () => utils.admin.listUsers.invalidate(),
+  });
   const setSuspension = trpc.admin.setSuspension.useMutation({
     onSuccess: () => utils.admin.listUsers.invalidate(),
   });

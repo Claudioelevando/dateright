@@ -53,7 +53,9 @@ export default function CadastroPage() {
       result = await signup.mutateAsync(values);
     } catch (error) {
       setServerError(
-        error instanceof TRPCClientError ? error.message : "Não foi possível criar sua conta agora.",
+        error instanceof TRPCClientError
+          ? error.message
+          : "Não foi possível criar sua conta agora.",
       );
       return;
     }

@@ -10,7 +10,8 @@ export async function GET(request: NextRequest) {
   // Só aceita caminhos relativos internos — evita open redirect via "//evil.com" (protocol-
   // relative), "/\evil.com" (browsers normalizam \ pra /) ou "@evil.com" (userinfo trick),
   // que fariam a URL final resolver pra outro host.
-  const isSafeNext = (value: string | null): value is string => !!value && /^\/(?!\/|\\)/.test(value);
+  const isSafeNext = (value: string | null): value is string =>
+    !!value && /^\/(?!\/|\\)/.test(value);
   const next = isSafeNext(rawNext) ? rawNext : "/profile";
 
   if (code) {

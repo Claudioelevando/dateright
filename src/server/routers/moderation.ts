@@ -25,7 +25,10 @@ const createReportInput = z.object({
 export const moderationRouter = router({
   createReport: protectedProcedure.input(createReportInput).mutation(async ({ ctx, input }) => {
     if (input.reportedProfileId === ctx.userId) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "Não é possível denunciar o próprio perfil." });
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Não é possível denunciar o próprio perfil.",
+      });
     }
 
     const report = await prisma.$transaction(async (tx) => {
@@ -40,7 +43,9 @@ export const moderationRouter = router({
 
       if (input.alsoBlock) {
         await tx.block.upsert({
-          where: { blockerId_blockedId: { blockerId: ctx.userId, blockedId: input.reportedProfileId } },
+          where: {
+            blockerId_blockedId: { blockerId: ctx.userId, blockedId: input.reportedProfileId },
+          },
           create: { blockerId: ctx.userId, blockedId: input.reportedProfileId },
           update: {},
         });
@@ -56,7 +61,10 @@ export const moderationRouter = router({
     .input(z.object({ profileId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       if (input.profileId === ctx.userId) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Não é possível bloquear o próprio perfil." });
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Não é possível bloquear o próprio perfil.",
+        });
       }
       await prisma.block.upsert({
         where: { blockerId_blockedId: { blockerId: ctx.userId, blockedId: input.profileId } },
@@ -166,6 +174,8 @@ export const moderationRouter = router({
         }
       });
 
-      return { status: input.action === "DISMISS" ? ("DISMISSED" as const) : ("ACTIONED" as const) };
+      return {
+        status: input.action === "DISMISS" ? ("DISMISSED" as const) : ("ACTIONED" as const),
+      };
     }),
 });

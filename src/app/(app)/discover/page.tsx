@@ -60,7 +60,10 @@ export default function DiscoverPage() {
 
       {current ? (
         <div className="space-y-6">
-          <ProfileCard profile={current} onBlocked={() => utils.discover.getCandidates.invalidate()} />
+          <ProfileCard
+            profile={current}
+            onBlocked={() => utils.discover.getCandidates.invalidate()}
+          />
           <div className="flex justify-center gap-6">
             <Button
               variant="outline"

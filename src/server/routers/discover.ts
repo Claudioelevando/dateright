@@ -26,7 +26,10 @@ function birthDateBounds(minAge: number, maxAge: number, today: Date) {
 
 // QuestionnaireAnswer.value é Json no banco, mas por convenção da aplicação sempre
 // string | string[] | number (ver comentário em prisma/schema.prisma).
-function toCompatibilityAnswer(answer: { questionId: string; value: unknown }): CompatibilityAnswer {
+function toCompatibilityAnswer(answer: {
+  questionId: string;
+  value: unknown;
+}): CompatibilityAnswer {
   return { questionId: answer.questionId, value: answer.value as string | string[] | number };
 }
 

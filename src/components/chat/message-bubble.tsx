@@ -20,7 +20,12 @@ export function MessageBubble({ body, createdAt, isOwn }: MessageBubbleProps) {
         )}
       >
         <p className="text-sm whitespace-pre-wrap">{body}</p>
-        <p className={cn("mt-0.5 text-right text-[10px]", isOwn ? "text-primary-foreground/70" : "text-muted-foreground")}>
+        <p
+          className={cn(
+            "mt-0.5 text-right text-[10px]",
+            isOwn ? "text-primary-foreground/70" : "text-muted-foreground",
+          )}
+        >
           {timeFormatter.format(createdAt)}
         </p>
       </div>

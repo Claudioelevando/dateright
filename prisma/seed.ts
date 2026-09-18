@@ -5,11 +5,7 @@ config({ path: ".env.local", quiet: true });
 const DIACRITICS = new RegExp("[\\u0300-\\u036f]", "g");
 
 function slugify(label: string) {
-  return label
-    .normalize("NFD")
-    .replace(DIACRITICS, "")
-    .toLowerCase()
-    .replace(/\s+/g, "-");
+  return label.normalize("NFD").replace(DIACRITICS, "").toLowerCase().replace(/\s+/g, "-");
 }
 
 const TYPE_MAP = { single: "SINGLE", multiple: "MULTIPLE", scale: "SCALE" } as const;

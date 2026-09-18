@@ -60,7 +60,10 @@ export const adminRouter = router({
       await prisma.profile.update({
         where: { id: input.profileId },
         data: input.suspended
-          ? { suspendedAt: new Date(), suspendedReason: input.reason ?? "Suspenso pela administração." }
+          ? {
+              suspendedAt: new Date(),
+              suspendedReason: input.reason ?? "Suspenso pela administração.",
+            }
           : { suspendedAt: null, suspendedReason: null },
       });
       return { suspended: input.suspended };

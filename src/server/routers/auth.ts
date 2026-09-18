@@ -26,7 +26,10 @@ export const authRouter = router({
         throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: TOO_MANY_REQUESTS_MESSAGE });
       }
 
-      const { error } = await ctx.supabase.auth.signInWithPassword({ email, password: input.password });
+      const { error } = await ctx.supabase.auth.signInWithPassword({
+        email,
+        password: input.password,
+      });
       if (error) {
         throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail ou senha incorretos." });
       }

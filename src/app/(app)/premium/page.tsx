@@ -108,7 +108,9 @@ function PremiumPageContent() {
           </FormAlert>
         )}
         {checkoutStatus === "cancelled" && (
-          <FormAlert variant="error">Checkout cancelado. Você pode assinar quando quiser.</FormAlert>
+          <FormAlert variant="error">
+            Checkout cancelado. Você pode assinar quando quiser.
+          </FormAlert>
         )}
         {actionError && <FormAlert variant="error">{actionError}</FormAlert>}
       </div>

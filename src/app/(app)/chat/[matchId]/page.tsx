@@ -18,7 +18,11 @@ export default function ChatPage() {
   const router = useRouter();
   const [body, setBody] = useState("");
 
-  const { data: match, isLoading: matchLoading, error: matchError } = trpc.match.getById.useQuery({
+  const {
+    data: match,
+    isLoading: matchLoading,
+    error: matchError,
+  } = trpc.match.getById.useQuery({
     matchId,
   });
   const { data: messages } = trpc.message.list.useQuery(
@@ -102,7 +106,12 @@ export default function ChatPage() {
           disabled={sendMutation.isPending}
           autoComplete="off"
         />
-        <Button type="submit" size="icon" disabled={!body.trim() || sendMutation.isPending} aria-label="Enviar">
+        <Button
+          type="submit"
+          size="icon"
+          disabled={!body.trim() || sendMutation.isPending}
+          aria-label="Enviar"
+        >
           <Send className="size-4" />
         </Button>
       </form>
