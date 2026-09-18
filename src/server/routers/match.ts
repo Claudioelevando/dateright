@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { calculateAge } from "@/lib/age";
 import { prisma } from "@/lib/db";
+import { invalidateDiscoverCache } from "@/lib/discover-cache";
 import { sendPushToProfile } from "@/lib/notifications/push";
 import { signCoverPhoto } from "@/lib/storage";
 
@@ -130,6 +131,10 @@ export const matchRouter = router({
 
       return { matched: true as const, matchId: match.id };
     });
+
+    // O swipe acabou de mudar a lista de exclusão de ctx.userId — sem isso o candidato
+    // continuaria aparecendo na descoberta até o cache expirar (até 60s, ver discover-cache.ts).
+    await invalidateDiscoverCache(ctx.userId);
 
     // Fora da transação: push é best-effort e não pode fazer a transação de match esperar
     // (ou falhar) por causa de um provedor externo lento/indisponível.

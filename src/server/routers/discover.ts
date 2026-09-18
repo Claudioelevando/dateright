@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { calculateAge } from "@/lib/age";
 import { prisma } from "@/lib/db";
+import { getCachedCandidates, setCachedCandidates } from "@/lib/discover-cache";
 import { boundingBox, distanceKm } from "@/lib/geo";
 import { calculateCompatibility, type CompatibilityAnswer } from "@/lib/matching/compatibility";
 import { signCoverPhoto } from "@/lib/storage";
@@ -31,6 +32,9 @@ function toCompatibilityAnswer(answer: { questionId: string; value: unknown }): 
 
 export const discoverRouter = router({
   getCandidates: activeProcedure.input(getCandidatesInput).query(async ({ ctx, input }) => {
+    const cached = await getCachedCandidates(ctx.userId, input.limit);
+    if (cached) return cached;
+
     const me = await prisma.profile.findUnique({ where: { id: ctx.userId } });
     if (!me) {
       throw new TRPCError({ code: "NOT_FOUND", message: "Complete seu perfil primeiro." });
@@ -111,7 +115,10 @@ export const discoverRouter = router({
       return distance === undefined || distance <= me.maxDistanceKm;
     });
 
-    if (withinRadius.length === 0) return [];
+    if (withinRadius.length === 0) {
+      await setCachedCandidates(ctx.userId, input.limit, []);
+      return [];
+    }
 
     const [questions, myAnswers, candidateAnswers] = await Promise.all([
       prisma.questionnaireQuestion.findMany({ select: { id: true, type: true } }),
@@ -128,7 +135,7 @@ export const discoverRouter = router({
       answersByProfileId.set(answer.profileId, list);
     }
 
-    return Promise.all(
+    const result = await Promise.all(
       withinRadius.map(async (candidate) => ({
         id: candidate.id,
         name: candidate.name,
@@ -148,5 +155,8 @@ export const discoverRouter = router({
         ),
       })),
     );
+
+    await setCachedCandidates(ctx.userId, input.limit, result);
+    return result;
   }),
 });
