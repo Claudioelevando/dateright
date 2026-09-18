@@ -2,6 +2,17 @@ import { getResend } from "@/lib/resend";
 
 const BRAND_COLOR = "#c2255c";
 
+// name vem do perfil do usuário (onboarding) — precisa escapar antes de interpolar no HTML
+// do e-mail, senão um nome como "<img src=x onerror=...>" quebra o layout ou injeta phishing.
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function emailShell(title: string, bodyHtml: string) {
   return `<!doctype html>
 <html lang="pt-BR">
@@ -47,11 +58,12 @@ async function sendSafely(params: { to: string; subject: string; html: string })
 
 export async function sendWelcomeEmail(to: string, name: string) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const safeName = escapeHtml(name);
   await sendSafely({
     to,
     subject: `Bem-vindo(a) ao DateRight, ${name}!`,
     html: emailShell(
-      `Bem-vindo(a), ${name}!`,
+      `Bem-vindo(a), ${safeName}!`,
       `<p>Seu perfil no DateRight foi criado. Agora é hora de conhecer pessoas com quem você realmente combina — em valores, princípios e visão de mundo, não só localização.</p>
        ${ctaButton(`${appUrl}/discover`, "Começar a descobrir")}`,
     ),
