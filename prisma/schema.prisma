@@ -48,6 +48,7 @@ model Profile {
   reportsReviewed Report[] @relation("ReportsReviewed")
   blocksGiven     Block[]  @relation("BlocksGiven")
   blocksReceived  Block[]  @relation("BlocksReceived")
+  pushTokens      PushToken[]
 
   @@map("profiles")
 }
@@ -245,4 +246,18 @@ model Block {
   @@unique([blockerId, blockedId])
   @@index([blockedId])
   @@map("blocks")
+}
+
+// Um token pode migrar de conta (logout/login com outro usuário no mesmo dispositivo) —
+// por isso é único globalmente e o registro faz upsert por token, não por profileId+token.
+model PushToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  profileId String   @db.Uuid
+  token     String   @unique
+  createdAt DateTime @default(now())
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+  @@map("push_tokens")
 }

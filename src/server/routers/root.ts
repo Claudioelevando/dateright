@@ -3,6 +3,7 @@ import { discoverRouter } from "./discover";
 import { matchRouter } from "./match";
 import { messageRouter } from "./message";
 import { moderationRouter } from "./moderation";
+import { notificationRouter } from "./notification";
 import { premiumRouter } from "./premium";
 import { profileRouter } from "./profile";
 import { questionnaireRouter } from "./questionnaire";
@@ -17,6 +18,7 @@ export const appRouter = router({
   premium: premiumRouter,
   moderation: moderationRouter,
   admin: adminRouter,
+  notification: notificationRouter,
 });
 
 export type AppRouter = typeof appRouter;

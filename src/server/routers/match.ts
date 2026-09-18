@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { calculateAge } from "@/lib/age";
 import { prisma } from "@/lib/db";
+import { sendPushToProfile } from "@/lib/notifications/push";
 import { signCoverPhoto } from "@/lib/storage";
 
 import { activeProcedure, router } from "../trpc";
@@ -73,7 +74,10 @@ export async function toMatchParticipant(profile: {
 export const matchRouter = router({
   swipe: activeProcedure.input(swipeInput).mutation(async ({ ctx, input }) => {
     if (input.targetProfileId === ctx.userId) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "Não é possível curtir o próprio perfil." });
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Não é possível curtir o próprio perfil.",
+      });
     }
 
     // Verificado fora da transação (o par bloqueado já foi excluído da descoberta — isso é
@@ -85,7 +89,7 @@ export const matchRouter = router({
 
     const [lockA, lockB] = canonicalPair(ctx.userId, input.targetProfileId);
 
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       // Lock por par canonicalizado: sem isso, dois swipes recíprocos quase simultâneos
       // podem cada um ler o swipe do outro ainda não commitado e concluir "sem match" —
       // o lock serializa as duas transações desse par, garantindo que a segunda enxergue
@@ -126,6 +130,37 @@ export const matchRouter = router({
 
       return { matched: true as const, matchId: match.id };
     });
+
+    // Fora da transação: push é best-effort e não pode fazer a transação de match esperar
+    // (ou falhar) por causa de um provedor externo lento/indisponível.
+    if (result.matched) {
+      await Promise.all([
+        sendPushToProfile(ctx.userId, {
+          title: "Novo match! 💕",
+          body: "Vocês curtiram um ao outro. Comece a conversar.",
+          url: `/chat/${result.matchId}`,
+        }),
+        sendPushToProfile(input.targetProfileId, {
+          title: "Novo match! 💕",
+          body: "Vocês curtiram um ao outro. Comece a conversar.",
+          url: `/chat/${result.matchId}`,
+        }),
+      ]);
+    } else if (input.action === "LIKE") {
+      const target = await prisma.profile.findUnique({
+        where: { id: input.targetProfileId },
+        select: { isPremium: true },
+      });
+      if (target?.isPremium) {
+        await sendPushToProfile(input.targetProfileId, {
+          title: "Alguém te curtiu 👀",
+          body: "Você é Premium — veja quem curtiu seu perfil.",
+          url: "/premium",
+        });
+      }
+    }
+
+    return result;
   }),
 
   listMatches: activeProcedure.query(async ({ ctx }) => {

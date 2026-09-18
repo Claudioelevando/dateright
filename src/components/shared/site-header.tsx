@@ -6,6 +6,7 @@ import { LogOut } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/shared/logo";
+import { PushNotificationManager } from "@/components/shared/push-notification-manager";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
@@ -45,6 +46,8 @@ export function SiteHeader() {
 
   return (
     <>
+      {!isAuthRoute && me && !me.suspendedAt && <PushNotificationManager />}
+
       <header className="border-border bg-background/80 sticky top-0 z-40 border-b backdrop-blur-sm">
         <div className="mx-auto flex h-16 max-w-4xl items-center justify-between gap-4 px-6">
           <Link href="/" aria-label="DateRight — início">
@@ -52,7 +55,7 @@ export function SiteHeader() {
           </Link>
 
           {!isAuthRoute && (
-            <nav className="scrollbar-none flex min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain [touch-action:pan-x]">
+            <nav className="flex min-w-0 [touch-action:pan-x] scrollbar-none items-center gap-1 overflow-x-auto overscroll-x-contain">
               {[...navItems, ...staffNavItems].map((item) => {
                 const isActive = pathname === item.href;
                 return (
