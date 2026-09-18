@@ -15,6 +15,11 @@ if (typeof window !== "undefined" && key) {
     person_profiles: "identified_only",
     capture_pageview: false,
     capture_pageleave: true,
+    // Autocapture registra texto/atributos de cliques e inputs do DOM — nesse app
+    // isso inclui bio, respostas do questionário e mensagens de chat. Desligado;
+    // só rastreamos $pageview manualmente.
+    autocapture: false,
+    disable_session_recording: true,
   });
 }
 
