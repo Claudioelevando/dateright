@@ -1,4 +1,5 @@
 import { adminRouter } from "./admin";
+import { authRouter } from "./auth";
 import { discoverRouter } from "./discover";
 import { matchRouter } from "./match";
 import { messageRouter } from "./message";
@@ -10,6 +11,7 @@ import { questionnaireRouter } from "./questionnaire";
 import { router } from "../trpc";
 
 export const appRouter = router({
+  auth: authRouter,
   profile: profileRouter,
   questionnaire: questionnaireRouter,
   discover: discoverRouter,

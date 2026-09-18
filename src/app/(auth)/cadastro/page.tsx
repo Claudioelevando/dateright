@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { TRPCClientError } from "@trpc/client";
 import { Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -14,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FieldError } from "@/components/shared/field-error";
 import { FormAlert } from "@/components/shared/form-alert";
-import { createClient } from "@/lib/supabase/client";
+import { trpc } from "@/lib/trpc/client";
 
 const signupSchema = z
   .object({
@@ -35,6 +36,7 @@ export default function CadastroPage() {
   const [serverError, setServerError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);
+  const signup = trpc.auth.signup.useMutation();
 
   const {
     register,
@@ -46,32 +48,23 @@ export default function CadastroPage() {
     setServerError(null);
     setSuccess(false);
 
-    const supabase = createClient();
-    const { data, error } = await supabase.auth.signUp({
-      email: values.email,
-      password: values.password,
-      options: {
-        data: { name: values.name },
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/onboarding`,
-      },
-    });
-
-    if (error) {
+    let result: { needsEmailConfirmation: boolean };
+    try {
+      result = await signup.mutateAsync(values);
+    } catch (error) {
       setServerError(
-        error.message.toLowerCase().includes("already")
-          ? "Este e-mail já está cadastrado."
-          : error.message,
+        error instanceof TRPCClientError ? error.message : "Não foi possível criar sua conta agora.",
       );
       return;
     }
 
     setSuccess(true);
 
-    if (data.session) {
+    if (result.needsEmailConfirmation) {
+      setNeedsEmailConfirmation(true);
+    } else {
       router.push("/onboarding");
       router.refresh();
-    } else {
-      setNeedsEmailConfirmation(true);
     }
   }
 

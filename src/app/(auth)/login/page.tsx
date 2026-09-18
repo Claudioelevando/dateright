@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { TRPCClientError } from "@trpc/client";
 import { Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -14,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FieldError } from "@/components/shared/field-error";
 import { FormAlert } from "@/components/shared/form-alert";
-import { createClient } from "@/lib/supabase/client";
+import { trpc } from "@/lib/trpc/client";
 
 const loginSchema = z.object({
   email: z.string().min(1, "Informe seu e-mail.").email("Informe um e-mail válido."),
@@ -27,6 +28,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const login = trpc.auth.login.useMutation();
 
   const {
     register,
@@ -38,14 +40,14 @@ export default function LoginPage() {
     setServerError(null);
     setSuccess(false);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({
-      email: values.email,
-      password: values.password,
-    });
-
-    if (error) {
-      setServerError("E-mail ou senha incorretos.");
+    try {
+      await login.mutateAsync(values);
+    } catch (error) {
+      setServerError(
+        error instanceof TRPCClientError && error.data?.code === "TOO_MANY_REQUESTS"
+          ? error.message
+          : "E-mail ou senha incorretos.",
+      );
       return;
     }
 

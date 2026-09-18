@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { TRPCClientError } from "@trpc/client";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -13,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FieldError } from "@/components/shared/field-error";
 import { FormAlert } from "@/components/shared/form-alert";
-import { createClient } from "@/lib/supabase/client";
+import { trpc } from "@/lib/trpc/client";
 
 const forgotPasswordSchema = z.object({
   email: z.string().min(1, "Informe seu e-mail.").email("Informe um e-mail válido."),
@@ -24,6 +25,7 @@ type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
 export default function RecuperarSenhaPage() {
   const [serverError, setServerError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const requestPasswordReset = trpc.auth.requestPasswordReset.useMutation();
 
   const {
     register,
@@ -35,15 +37,14 @@ export default function RecuperarSenhaPage() {
     setServerError(null);
     setSuccess(false);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/atualizar-senha`,
-    });
-
-    // Nunca revelamos se o e-mail existe ou não (evita enumeração de contas) — só
-    // mostramos erro em falhas genuínas do serviço (ex.: rate limit).
-    if (error && error.status !== 400) {
-      setServerError("Não foi possível enviar o e-mail agora. Tente novamente em instantes.");
+    try {
+      await requestPasswordReset.mutateAsync(values);
+    } catch (error) {
+      setServerError(
+        error instanceof TRPCClientError
+          ? error.message
+          : "Não foi possível enviar o e-mail agora. Tente novamente em instantes.",
+      );
       return;
     }
 
